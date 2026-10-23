@@ -136,17 +136,26 @@ func TestOnlyOneWriterWinsAVersion(t *testing.T) {
 	repocontract.Seed(t, f, "node-1", scorecard.Window7d, 1)
 	const writers = 8
 	errs := make([]error, writers)
+	// Every writer must hold the SAME version: load and change all aggregates
+	// first, and only then release the saves together.
+	loaded := make([]*scorecard.NodeScorecard, writers)
+	for i := range loaded {
+		sc, err := f.Scorecards.Get(context.Background(), "node-1:7d")
+		noErr(t, err)
+		noErr(t, sc.RecordObservation(repocontract.Feed(t, "feed-"+string(rune('a'+i)), 10+i)))
+		loaded[i] = sc
+	}
+	start := make(chan struct{})
 	var wg sync.WaitGroup
 	for i := range errs {
-		loaded, err := f.Scorecards.Get(context.Background(), "node-1:7d")
-		noErr(t, err)
-		noErr(t, loaded.RecordObservation(repocontract.Feed(t, "feed-"+string(rune('a'+i)), 10+i)))
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs[i] = f.Scorecards.Save(context.Background(), loaded)
+			<-start
+			errs[i] = f.Scorecards.Save(context.Background(), loaded[i])
 		}()
 	}
+	close(start)
 	wg.Wait()
 	wins := 0
 	for _, err := range errs {

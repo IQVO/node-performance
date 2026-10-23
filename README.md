@@ -48,6 +48,19 @@ Go, hexagonal (`internal/domain`, `internal/application`, `internal/adapters`, `
 (`com.retailnetwork.partner.node-performance.scorecard.<Event>`), transactional outbox with an attempt cap, chi REST adapter
 with problem+json, dependency-aware `/readyz`.
 
+## Deployment
+
+Helm chart: [`charts/node-performance/`](charts/node-performance/) (one component, the `api`). It refuses to render without
+`database.url` or `database.existingSecret` (the DSN always reaches the pod through a Secret), `kafka.brokers`, the five
+`config.*ConsumerGroup` ids (stable, service-prefixed, never the pod name) and a `terminationGracePeriodSeconds` of at least
+`config.shutdownDrainDelay` + 35 s (40 s by default). Defaults to the image `ghcr.io/iqvo/node-performance:v<appVersion>`.
+
+```
+helm template np charts/node-performance -f charts/node-performance/ci/default-values.yaml
+bash charts/node-performance/tests/render_test.sh
+python3 charts/node-performance/tests/test_service_selectors.py
+```
+
 ## Develop
 
 ```

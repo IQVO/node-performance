@@ -1,0 +1,30 @@
+{{ .Chart.Name }} has been deployed.
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+Service:   {{ include "node-performance.fullname" . }} ({{ .Values.service.type }}, port {{ .Values.service.port }})
+
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+Ingress:   http://{{ .host }}{{ (index .paths 0).path }}
+{{- end }}
+{{- else if .Values.gatewayApi.enabled }}
+Gateway API HTTPRoute enabled - routed via the parentRefs/hosts configured
+in gatewayApi.*.
+{{- else }}
+To reach it locally:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "node-performance.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://localhost:8080/healthz
+{{- end }}
+
+Scorecard events are relayed from the transactional outbox to
+retailnetwork.node-performance.events and retailnetwork.node-performance.analytics
+({{ .Values.kafka.brokers }}). Postgres and Kafka are the only runtime.
+
+The five consumers are ON, each under a stable group id:
+  vendor-connectivity    group {{ .Values.config.vendorConnectivityConsumerGroup }}
+  shipping-and-tracking  group {{ .Values.config.shippingAndTrackingConsumerGroup }}
+  delivery-promise       group {{ .Values.config.deliveryPromiseConsumerGroup }}
+  offer-availability     group {{ .Values.config.offerAvailabilityConsumerGroup }}
+  node-topology          group {{ .Values.config.nodeTopologyConsumerGroup }}

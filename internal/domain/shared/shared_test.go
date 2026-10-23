@@ -60,16 +60,28 @@ func TestValidTextN(t *testing.T) {
 	}
 }
 
-func TestUTCAndHeader(t *testing.T) {
-	if !UTC(time.Time{}).IsZero() {
+func TestInstantIsUTCAndMicrosecondPrecision(t *testing.T) {
+	if !Instant(time.Time{}).IsZero() {
 		t.Fatal("zero stays zero")
 	}
 	brt := time.FixedZone("BRT", -3*3600)
 	at := time.Date(2026, 10, 22, 9, 0, 0, 0, brt)
-	got := UTC(at)
+	got := Instant(at)
 	if got.Location() != time.UTC || !got.Equal(at) {
-		t.Fatalf("UTC() = %v", got)
+		t.Fatalf("Instant() = %v", got)
 	}
+	fine := time.Date(2026, 10, 22, 12, 0, 0, 123456789, time.UTC)
+	if got := Instant(fine); got.Nanosecond() != 123456000 {
+		t.Fatalf("Instant must truncate to the microsecond: %d ns", got.Nanosecond())
+	}
+	if got := Instant(time.Date(2026, 10, 22, 12, 0, 0, 123999999, time.UTC)); got.Nanosecond() != 123999000 {
+		t.Fatalf("Instant truncates, it does not round: %d ns", got.Nanosecond())
+	}
+}
+
+func TestHeader(t *testing.T) {
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	got := at
 	h := Header{Version: 4, At: got}
 	if h.AggregateVersion() != 4 || !h.OccurredAt().Equal(at) {
 		t.Fatalf("header accessors wrong: %+v", h)

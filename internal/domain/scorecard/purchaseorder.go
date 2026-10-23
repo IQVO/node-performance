@@ -26,6 +26,15 @@ func (f PurchaseOrderFacts) Validate() error {
 	return err
 }
 
+// Normalized returns f with every instant as the adapters store it
+// (shared.Instant: UTC, microsecond precision).
+func (f PurchaseOrderFacts) Normalized() PurchaseOrderFacts {
+	f.IssuedAt = shared.Instant(f.IssuedAt)
+	f.AckBy = shared.Instant(f.AckBy)
+	f.RequiredShipBy = shared.Instant(f.RequiredShipBy)
+	return f
+}
+
 // Merge returns f filled with the instants of newer that f does not have yet: a
 // field is only ever filled, never erased or overwritten.
 func (f PurchaseOrderFacts) Merge(newer PurchaseOrderFacts) PurchaseOrderFacts {

@@ -104,9 +104,9 @@ func TestNewHandover(t *testing.T) {
 		want bool
 	}{
 		{"early", at(10), true},
-		{"a nanosecond before", required.Add(-time.Nanosecond), true},
+		{"a microsecond before", required.Add(-time.Microsecond), true},
 		{"exactly on requiredShipBy", required, true},
-		{"a nanosecond after", required.Add(time.Nanosecond), false},
+		{"a microsecond after", required.Add(time.Microsecond), false},
 		{"much later", at(1200), false},
 	} {
 		o, err := NewHandover("evt-3", tc.at, required)

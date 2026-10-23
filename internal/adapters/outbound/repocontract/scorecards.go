@@ -127,10 +127,10 @@ func scListDue(t *testing.T, f Fixture) {
 	if !ok {
 		t.Fatal("expiring has an observation")
 	}
-	got, err = f.Scorecards.ListDue(ctx, exp.Add(-time.Nanosecond), 10)
+	got, err = f.Scorecards.ListDue(ctx, exp.Add(-time.Microsecond), 10)
 	noErr(t, err)
 	if len(got) != 2 {
-		t.Fatalf("one nanosecond before the oldest observation leaves, due = %v", got)
+		t.Fatalf("one microsecond before the oldest observation leaves, due = %v", got)
 	}
 	got, err = f.Scorecards.ListDue(ctx, exp, 10)
 	noErr(t, err)

@@ -72,3 +72,18 @@ func TestPurchaseOrderFactsJudgements(t *testing.T) {
 		}
 	}
 }
+
+func TestPurchaseOrderFactsNormalized(t *testing.T) {
+	brt := time.FixedZone("BRT", -3*3600)
+	fine := time.Date(2026, 10, 22, 9, 0, 0, 123456789, brt)
+	got := (PurchaseOrderFacts{PoNumber: "po-1", NodeID: "n", IssuedAt: fine, AckBy: fine, RequiredShipBy: fine}).Normalized()
+	want := time.Date(2026, 10, 22, 12, 0, 0, 123456000, time.UTC)
+	for name, v := range map[string]time.Time{"issuedAt": got.IssuedAt, "ackBy": got.AckBy, "requiredShipBy": got.RequiredShipBy} {
+		if !v.Equal(want) || v.Location() != time.UTC {
+			t.Errorf("%s = %v, want %v", name, v, want)
+		}
+	}
+	if zero := (PurchaseOrderFacts{PoNumber: "po-1"}).Normalized(); !zero.IssuedAt.IsZero() || !zero.AckBy.IsZero() {
+		t.Fatal("a missing instant stays zero")
+	}
+}

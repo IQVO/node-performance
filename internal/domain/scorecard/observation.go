@@ -65,7 +65,7 @@ func (o Observation) validate() error {
 }
 
 func newObservation(sourceID string, kind Kind, at time.Time) (Observation, error) {
-	o := Observation{SourceEventID: sourceID, Kind: kind, At: shared.UTC(at)}
+	o := Observation{SourceEventID: sourceID, Kind: kind, At: shared.Instant(at)}
 	if err := o.validate(); err != nil {
 		return Observation{}, err
 	}

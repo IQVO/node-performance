@@ -157,7 +157,7 @@ func (i Intake) PurchaseOrderIssued(ctx context.Context, in PurchaseOrderIssued)
 	return i.apply(ctx, in.Ref, func(ctx context.Context) (Outcome, error) {
 		return OutcomeApplied, i.upsertFacts(ctx, scorecard.PurchaseOrderFacts{
 			PoNumber: in.PoNumber, NodeID: scorecard.NodeID(in.NodeID),
-			IssuedAt: in.Ref.Time.UTC(), AckBy: in.AckBy.UTC(), RequiredShipBy: in.RequiredShipBy.UTC(),
+			IssuedAt: in.Ref.Time, AckBy: in.AckBy, RequiredShipBy: in.RequiredShipBy,
 		})
 	})
 }
@@ -166,7 +166,7 @@ func (i Intake) PurchaseOrderIssued(ctx context.Context, in PurchaseOrderIssued)
 func (i Intake) ShipmentConfirmed(ctx context.Context, in ShipmentConfirmed) (Outcome, error) {
 	return i.apply(ctx, in.Ref, func(ctx context.Context) (Outcome, error) {
 		return OutcomeApplied, i.upsertFacts(ctx, scorecard.PurchaseOrderFacts{
-			PoNumber: in.PoNumber, NodeID: scorecard.NodeID(in.NodeID), RequiredShipBy: in.RequiredShipBy.UTC(),
+			PoNumber: in.PoNumber, NodeID: scorecard.NodeID(in.NodeID), RequiredShipBy: in.RequiredShipBy,
 		})
 	})
 }
@@ -175,7 +175,7 @@ func (i Intake) upsertFacts(ctx context.Context, f scorecard.PurchaseOrderFacts)
 	if err := f.Validate(); err != nil {
 		return err
 	}
-	return i.Facts.Upsert(ctx, f)
+	return i.Facts.Upsert(ctx, f.Normalized())
 }
 
 // factsOf loads the facts of a purchase order; a miss, or facts that cannot

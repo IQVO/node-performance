@@ -205,7 +205,7 @@ func TestRecomputeBackToGradedFromProvisional(t *testing.T) {
 
 func TestRecomputeWindowEdges(t *testing.T) {
 	now := at(100 * 24 * 60)
-	inside := now.Add(-Window7d.Duration()).Add(time.Nanosecond)
+	inside := now.Add(-Window7d.Duration()).Add(time.Microsecond)
 	onEdge := now.Add(-Window7d.Duration())
 	s := open(t, Window7d,
 		obs("inside", KindFeedApplied, inside),
@@ -326,10 +326,10 @@ func TestDueForRecomputeAndExpiry(t *testing.T) {
 	if !ok || !exp.Equal(at(100).Add(Window7d.Duration())) {
 		t.Fatalf("ExpiresAt = %v, %v; want the oldest instant plus the window", exp, ok)
 	}
-	if s.DueForRecompute(exp.Add(-time.Nanosecond)) {
-		t.Error("not due a nanosecond before the oldest observation leaves")
+	if s.DueForRecompute(exp.Add(-time.Microsecond)) {
+		t.Error("not due a microsecond before the oldest observation leaves")
 	}
-	if !s.DueForRecompute(exp) || !s.DueForRecompute(exp.Add(time.Nanosecond)) {
+	if !s.DueForRecompute(exp) || !s.DueForRecompute(exp.Add(time.Microsecond)) {
 		t.Error("due once the oldest observation leaves the window")
 	}
 	empty := open(t, Window7d, obs("only", KindFeedApplied, at(100)))

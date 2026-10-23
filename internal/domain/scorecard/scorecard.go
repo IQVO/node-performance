@@ -70,7 +70,7 @@ func build(s Snapshot, restoring bool) (*NodeScorecard, error) {
 	}
 	return &NodeScorecard{
 		nodeID: s.NodeID, window: s.Window, state: s.State, grade: s.Grade, metrics: s.Metrics,
-		computedAt: shared.UTC(s.ComputedAt), dirty: s.Dirty, version: s.Version, observations: obs,
+		computedAt: shared.Instant(s.ComputedAt), dirty: s.Dirty, version: s.Version, observations: obs,
 	}, nil
 }
 
@@ -119,7 +119,7 @@ func indexObservations(list []Observation) (map[string]Observation, error) {
 		if _, dup := out[o.SourceEventID]; dup {
 			return nil, shared.Invalid("observation %q appears twice", o.SourceEventID)
 		}
-		o.At = shared.UTC(o.At)
+		o.At = shared.Instant(o.At)
 		out[o.SourceEventID] = o
 	}
 	return out, nil
@@ -135,7 +135,7 @@ func (s *NodeScorecard) RecordObservation(o Observation) error {
 	if _, dup := s.observations[o.SourceEventID]; dup {
 		return ErrDuplicateObservation
 	}
-	o.At = shared.UTC(o.At)
+	o.At = shared.Instant(o.At)
 	s.observations[o.SourceEventID] = o
 	s.dirty = true
 	s.version++
@@ -148,7 +148,7 @@ func (s *NodeScorecard) RecordObservation(o Observation) error {
 // (never PROVISIONAL to PROVISIONAL) and one NodeThresholdBreached per metric
 // that crossed its threshold between two GRADED states (ADR 0002, A11, A13).
 func (s *NodeScorecard) Recompute(now time.Time) []shared.Event {
-	now = now.UTC()
+	now = shared.Instant(now)
 	kept := s.inWindow(now)
 	metrics := Compute(kept)
 	// GradeFor's only error is ErrInsufficientObservations: below the minimum

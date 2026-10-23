@@ -38,4 +38,4 @@ Aggregate, metric definitions and assumptions A1-A23 are in docs/adr/0002; consu
 
 ## Workflow
 GitFlow: feature/* -> PR into develop, CI green before merge, never push develop or main. lefthook: pre-commit fmt/vet/lint, pre-push `make check`. Commit and push after each step.
-Open follow-up: the Helm chart (docs/before-first-release.md rows 5-9).
+Deploy: charts/node-performance (api only; DSN from a Secret, five `config.*ConsumerGroup` values and `kafka.brokers` required, grace period >= drain + 35 s); tests `bash charts/node-performance/tests/render_test.sh` and `python3 charts/node-performance/tests/test_service_selectors.py`. Open follow-up: repository secrets (docs/before-first-release.md row 11).

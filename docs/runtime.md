@@ -79,6 +79,30 @@ must exceed it.
   row is skipped, later events of the same scorecard can overtake it.
 - `idempotency_keys` exists for a future write route; no route uses it today.
 
+## Deployment (Helm)
+
+`charts/node-performance/` deploys the `api` and nothing else (no MCP, frontend, projector or reports).
+`values.yaml` documents every key; each `config.*` value maps 1:1 to one variable of the table above, and the
+chart ConfigMap (mounted with `envFrom`, with a `checksum/config` pod annotation) carries every one of them except the two
+DSNs.
+
+- Required, refused at render with the value named: `database.url` or `database.existingSecret` (`DATABASE_URL`
+  from a `secretKeyRef`; `MIGRATIONS_DATABASE_URL` from `database.migrationsExistingSecretKey` with `optional: true`,
+  the binary falls back to `DATABASE_URL`), `kafka.brokers`, and `config.vendorConnectivityConsumerGroup`,
+  `shippingAndTrackingConsumerGroup`, `deliveryPromiseConsumerGroup`, `offerAvailabilityConsumerGroup`,
+  `nodeTopologyConsumerGroup`.
+- Also refused: a group id that is an env expansion (`$(POD_NAME)`), any `*_MODE` or chart-managed variable in `extraEnv`,
+  a `config.httpAddr` port that is not `service.targetPort`, and a `terminationGracePeriodSeconds` below
+  `config.shutdownDrainDelay` + 35 s (the sum of the bounds above plus 5 s of margin; 40 s with the default drain).
+- Pod: uid 1000, `runAsNonRoot`, read-only root filesystem, no privilege escalation, all capabilities dropped,
+  seccomp `RuntimeDefault`; startup and liveness on `/healthz`, readiness on `/readyz`.
+- HPA, Ingress and Gateway API HTTPRoute are off by default. More than one replica is safe by design (the relay claims with
+  `FOR UPDATE SKIP LOCKED`, consumers share one group per topic) but has not been load-tested.
+- Tests: `bash charts/node-performance/tests/render_test.sh` and
+  `python3 charts/node-performance/tests/test_service_selectors.py`, both run by the `chart-tests` CI job;
+  `helm-lint` (pull requests) runs `ct lint` and the selector test. The `release` job packages
+  `node-performance-<version>.tgz`.
+
 ## Tests
 
 `make check` (format, vet, build, lint, unit + handler + BDD tests), `make coverage` (90%

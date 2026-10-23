@@ -33,8 +33,8 @@ info:
     `retailnetwork.node-performance.analytics`. Both types are catalogued in
     ADR 0004.
 
-    **Consumed.** Thirteen events from five producers, each under the stable
-    consumer group named by `NODE_PERFORMANCE_CONSUMER_GROUP`; every message is
+    **Consumed.** Thirteen events from five producers, each topic under its own stable
+    consumer group named by a mandatory environment variable (ADR 0003); every message is
     deduplicated on the CloudEvents `id` in the `processed_events` inbox, in the
     same transaction as its effect. The consumed messages below are tolerant
     local copies: only the fields this service relies on are required, unknown
@@ -91,7 +91,7 @@ channels:
     title: vendor-connectivity integration topic (consumed)
     description: |
       The integration topic of vendor-connectivity, consumed by the node-performance
-      consumer group (NODE_PERFORMANCE_CONSUMER_GROUP). Tolerant decoding:
+      consumer group read from VENDOR_CONNECTIVITY_CONSUMER_GROUP. Tolerant decoding:
       unknown types and unknown fields are ignored; every message is
       deduplicated on the CloudEvents `id` in the inbox.
     messages:
@@ -114,7 +114,7 @@ channels:
     title: shipping-and-tracking integration topic (consumed)
     description: |
       The integration topic of shipping-and-tracking, consumed by the node-performance
-      consumer group (NODE_PERFORMANCE_CONSUMER_GROUP). Tolerant decoding:
+      consumer group read from SHIPPING_AND_TRACKING_CONSUMER_GROUP. Tolerant decoding:
       unknown types and unknown fields are ignored; every message is
       deduplicated on the CloudEvents `id` in the inbox.
     messages:
@@ -125,7 +125,7 @@ channels:
     title: delivery-promise integration topic (consumed)
     description: |
       The integration topic of delivery-promise, consumed by the node-performance
-      consumer group (NODE_PERFORMANCE_CONSUMER_GROUP). Tolerant decoding:
+      consumer group read from DELIVERY_PROMISE_CONSUMER_GROUP. Tolerant decoding:
       unknown types and unknown fields are ignored; every message is
       deduplicated on the CloudEvents `id` in the inbox.
     messages:
@@ -138,7 +138,7 @@ channels:
     title: offer-availability integration topic (consumed)
     description: |
       The integration topic of offer-availability, consumed by the node-performance
-      consumer group (NODE_PERFORMANCE_CONSUMER_GROUP). Tolerant decoding:
+      consumer group read from OFFER_AVAILABILITY_CONSUMER_GROUP. Tolerant decoding:
       unknown types and unknown fields are ignored; every message is
       deduplicated on the CloudEvents `id` in the inbox.
     messages:
@@ -149,7 +149,7 @@ channels:
     title: node-topology integration topic (consumed)
     description: |
       The integration topic of node-topology, consumed by the node-performance
-      consumer group (NODE_PERFORMANCE_CONSUMER_GROUP). Tolerant decoding:
+      consumer group read from NODE_TOPOLOGY_CONSUMER_GROUP. Tolerant decoding:
       unknown types and unknown fields are ignored; every message is
       deduplicated on the CloudEvents `id` in the inbox.
     messages:
@@ -195,7 +195,7 @@ operations:
     summary: Consume VendorOnboarded, PurchaseOrderIssued, PurchaseOrderAccepted, PurchaseOrderRejected, PurchaseOrderExpired, VendorShipmentConfirmed, SubmissionProcessed.
     description: |
       Consumed from `retailnetwork.vendor-connectivity.events` under the consumer group named by
-      NODE_PERFORMANCE_CONSUMER_GROUP, dispatched on the full CloudEvents
+      VENDOR_CONNECTIVITY_CONSUMER_GROUP, dispatched on the full CloudEvents
       `type`, idempotent on the CloudEvents `id` (inbox table
       `processed_events`). Other types on the topic are ignored.
     tags:
@@ -216,7 +216,7 @@ operations:
     summary: Consume PackageHandedOver.
     description: |
       Consumed from `retailnetwork.shipping-and-tracking.events` under the consumer group named by
-      NODE_PERFORMANCE_CONSUMER_GROUP, dispatched on the full CloudEvents
+      SHIPPING_AND_TRACKING_CONSUMER_GROUP, dispatched on the full CloudEvents
       `type`, idempotent on the CloudEvents `id` (inbox table
       `processed_events`). Other types on the topic are ignored.
     tags:
@@ -231,7 +231,7 @@ operations:
     summary: Consume PromiseKept, PromiseBroken.
     description: |
       Consumed from `retailnetwork.delivery-promise.events` under the consumer group named by
-      NODE_PERFORMANCE_CONSUMER_GROUP, dispatched on the full CloudEvents
+      DELIVERY_PROMISE_CONSUMER_GROUP, dispatched on the full CloudEvents
       `type`, idempotent on the CloudEvents `id` (inbox table
       `processed_events`). Other types on the topic are ignored.
     tags:
@@ -247,7 +247,7 @@ operations:
     summary: Consume InventoryFeedApplied.
     description: |
       Consumed from `retailnetwork.offer-availability.events` under the consumer group named by
-      NODE_PERFORMANCE_CONSUMER_GROUP, dispatched on the full CloudEvents
+      OFFER_AVAILABILITY_CONSUMER_GROUP, dispatched on the full CloudEvents
       `type`, idempotent on the CloudEvents `id` (inbox table
       `processed_events`). Other types on the topic are ignored.
     tags:
@@ -262,7 +262,7 @@ operations:
     summary: Consume NodeRegistered, NodeOperationalProfileDeclared.
     description: |
       Consumed from `retailnetwork.node-topology.events` under the consumer group named by
-      NODE_PERFORMANCE_CONSUMER_GROUP, dispatched on the full CloudEvents
+      NODE_TOPOLOGY_CONSUMER_GROUP, dispatched on the full CloudEvents
       `type`, idempotent on the CloudEvents `id` (inbox table
       `processed_events`). Other types on the topic are ignored.
     tags:

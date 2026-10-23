@@ -1,8 +1,7 @@
 // Package kafkatest boots ONE real Kafka broker through testcontainers per
 // test binary. It never reads KAFKA_BROKERS, never hardcodes a broker address
 // and never skips: a missing Docker is a test failure (fleet rule,
-// TestKafkaIntegrationTestsUseTestcontainers). It is test support: nothing under
-// cmd/ imports it.
+// TestKafkaIntegrationTestsUseTestcontainers). It is test support: no shipped binary imports it.
 package kafkatest
 
 import (

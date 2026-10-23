@@ -1,8 +1,7 @@
 // Package pgtest boots ONE real Postgres through testcontainers per test binary
 // and hands every test its own database, cloned from a template that already
 // has the embedded migrations applied. It never reads DATABASE_URL and never
-// skips: a missing Docker is a test failure. It is test support: nothing under
-// cmd/ imports it.
+// skips: a missing Docker is a test failure. It is test support: no shipped binary imports it.
 package pgtest
 
 import (

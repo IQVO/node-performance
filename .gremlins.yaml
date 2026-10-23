@@ -24,8 +24,10 @@ unleash:
     # sit strictly BELOW the number this repo can meet today. Measure
     # first (`make mutation-full`), THEN set these -- don't guess/copy a
     # sibling repo's numbers, every domain layer's mutant survivability
-    # differs. See HARNESS.md's mutation-testing section for the
+    # differs. Measured on 2026-10-23 with `gremlins unleash` per package: shared
+    # 31 killed of 31, scorecard 95 killed of 95 (efficacy and mutator coverage
+    # 100% for both); 95 is strictly below both. See HARNESS.md's mutation-testing section for the
     # tagless-switch-under-reports pitfall before assuming a low number
     # means missing tests.
-    efficacy: "0"
-    mutant-coverage: "0"
+    efficacy: "95"
+    mutant-coverage: "95"

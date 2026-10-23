@@ -1,0 +1,129 @@
+{{- include "node-performance.requireRealRuntime" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "node-performance.fullname" . }}
+  labels:
+    {{- include "node-performance.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  {{- if not .Values.autoscaling.api.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "node-performance.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "node-performance.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "node-performance.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "node-performance.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          # Every config.* value also reaches cmd/api through the chart
+          # ConfigMap; the explicit `env` entries below win for the same key
+          # and carry the same values. The checksum/config annotation above
+          # rolls the pods when the ConfigMap changes.
+          envFrom:
+            - configMapRef:
+                name: {{ include "node-performance.fullname" . }}
+          # Env contract: exactly the variables cmd/api/config.go reads.
+          env:
+            - name: HTTP_ADDR
+              value: {{ .Values.config.httpAddr | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: RECOMPUTE_INTERVAL
+              value: {{ .Values.config.recomputeInterval | quote }}
+            - name: OUTBOX_RELAY_INTERVAL
+              value: {{ .Values.config.outboxRelayInterval | quote }}
+            - name: OUTBOX_MAX_ATTEMPTS
+              value: {{ .Values.config.outboxMaxAttempts | quote }}
+            - name: SHUTDOWN_DRAIN_DELAY
+              value: {{ .Values.config.shutdownDrainDelay | quote }}
+            # Mandatory: the relay, the five consumers and /readyz dial Kafka.
+            - name: KAFKA_BROKERS
+              value: {{ .Values.kafka.brokers | quote }}
+            # The five STABLE consumer group ids come from values, never a
+            # literal and never the pod name; the chart refuses an empty one.
+            - name: VENDOR_CONNECTIVITY_CONSUMER_GROUP
+              value: {{ .Values.config.vendorConnectivityConsumerGroup | quote }}
+            - name: SHIPPING_AND_TRACKING_CONSUMER_GROUP
+              value: {{ .Values.config.shippingAndTrackingConsumerGroup | quote }}
+            - name: DELIVERY_PROMISE_CONSUMER_GROUP
+              value: {{ .Values.config.deliveryPromiseConsumerGroup | quote }}
+            - name: OFFER_AVAILABILITY_CONSUMER_GROUP
+              value: {{ .Values.config.offerAvailabilityConsumerGroup | quote }}
+            - name: NODE_TOPOLOGY_CONSUMER_GROUP
+              value: {{ .Values.config.nodeTopologyConsumerGroup | quote }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "node-performance.databaseSecretName" . }}
+                  key: {{ .Values.database.existingSecretKey }}
+            {{- if .Values.database.migrationsExistingSecretKey }}
+            # A direct (non-pooled) connection used only for the boot
+            # migrations. `optional: true` so a secret without this key still
+            # starts the pod: the binary falls back to DATABASE_URL.
+            - name: MIGRATIONS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "node-performance.databaseSecretName" . }}
+                  key: {{ .Values.database.migrationsExistingSecretKey }}
+                  optional: true
+            {{- end }}
+            {{- range .Values.extraEnv }}
+            - {{ toYaml . | nindent 14 | trim }}
+            {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

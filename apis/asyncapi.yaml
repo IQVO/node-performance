@@ -1,0 +1,941 @@
+asyncapi: 3.0.0
+
+info:
+  title: node-performance Domain Events
+  version: "1.0.0"
+  contact:
+    name: node-performance maintainers
+    url: https://github.com/IQVO/node-performance
+    email: node-performance@iqvo.example.com
+  license:
+    name: UNLICENSED
+  tags:
+    - name: node-performance
+      description: The node-performance bounded context (retail network, partner tier).
+    - name: scorecard
+      description: Events raised by the NodeScorecard aggregate.
+    - name: consumed
+      description: Tolerant local copies of the events this service consumes.
+  description: |
+    Event catalog for the **node-performance** bounded context of the retail
+    network (partner tier): it measures every node against what it declared and
+    what was asked of it (acknowledgement latency, rejections, on-time handover
+    against requiredShipBy, promise-kept rate, inventory feed freshness) over
+    7-day and 30-day rolling windows and grades the node (ADR 0001, ADR 0002).
+
+    **Published.** Two events through a **transactional outbox**: the scorecard
+    row and its already-encoded events are written in ONE database transaction
+    and an always-on relay drains them to Kafka (at-least-once; the CloudEvents
+    `id` is stored with the outbox row, so a retry republishes the same `id`).
+    `NodeScorecardUpdated` is an integration event on
+    `retailnetwork.node-performance.events` (consumers: delivery-promise,
+    order-sourcing). `NodeThresholdBreached` is analytics-only and goes ONLY to
+    `retailnetwork.node-performance.analytics`. Both types are catalogued in
+    ADR 0004.
+
+    **Consumed.** Thirteen events from five producers, each topic under its own stable
+    consumer group named by a mandatory environment variable (ADR 0003); every message is
+    deduplicated on the CloudEvents `id` in the `processed_events` inbox, in the
+    same transaction as its effect. The consumed messages below are tolerant
+    local copies: only the fields this service relies on are required, unknown
+    fields and unknown types are ignored, dispatch is on the full `type`.
+
+    **Envelope (mandatory).** CloudEvents 1.0, structured content mode, Kafka
+    header `content-type: application/cloudevents+json; charset=UTF-8`.
+    `specversion`, `id`, `source` (`/retailnetwork/node-performance`), `type`,
+    `subject` (the scorecardId, `nodeId:window`), `time`, `datacontenttype`
+    (`application/json`) and `dataschema`
+    (`urn:retailnetwork:node-performance:<stream>:<EventName>:v1`) are all
+    required. Kafka key = the subject, so one scorecard's events stay ordered on
+    one partition. Type = `com.retailnetwork.partner.node-performance.scorecard.<EventName>`.
+    A breaking payload change is a new `.v2` type, never a mutation.
+
+    **Conventions.** `data` is camelCase; ids are strings; instants are RFC 3339
+    UTC; durations are integers named `...Minutes`; optional fields are omitted
+    when absent (never null); evolution is additive only.
+
+servers:
+  production:
+    host: "{brokers}"
+    protocol: kafka
+    description: Retail-network Kafka broker (host supplied by the deployment environment via KAFKA_BROKERS).
+    variables:
+      brokers:
+        default: "kafka.retail-network.internal:9092"
+
+defaultContentType: application/cloudevents+json
+
+channels:
+  nodePerformanceEvents:
+    address: retailnetwork.node-performance.events
+    title: node-performance integration topic
+    description: |
+      This service's integration topic. Written by the outbox relay; key =
+      subject (the scorecardId). Every message carries the CloudEvents
+      content-type header. Dispatch on the full `type`, ignore unknown types,
+      dedupe on `id`.
+    messages:
+      NodeScorecardUpdated:
+        $ref: "#/components/messages/NodeScorecardUpdated"
+  nodePerformanceAnalytics:
+    address: retailnetwork.node-performance.analytics
+    title: node-performance analytics topic
+    description: |
+      Analytics-only events (conventions.analytics_rule): written ONLY here,
+      never to the integration topic. No in-organization consumer.
+    messages:
+      NodeThresholdBreached:
+        $ref: "#/components/messages/NodeThresholdBreached"
+  vendorConnectivityEvents:
+    address: retailnetwork.vendor-connectivity.events
+    title: vendor-connectivity integration topic (consumed)
+    description: |
+      The integration topic of vendor-connectivity, consumed by the node-performance
+      consumer group read from VENDOR_CONNECTIVITY_CONSUMER_GROUP. Tolerant decoding:
+      unknown types and unknown fields are ignored; every message is
+      deduplicated on the CloudEvents `id` in the inbox.
+    messages:
+      VendorOnboarded:
+        $ref: "#/components/messages/VendorOnboarded"
+      PurchaseOrderIssued:
+        $ref: "#/components/messages/PurchaseOrderIssued"
+      PurchaseOrderAccepted:
+        $ref: "#/components/messages/PurchaseOrderAccepted"
+      PurchaseOrderRejected:
+        $ref: "#/components/messages/PurchaseOrderRejected"
+      PurchaseOrderExpired:
+        $ref: "#/components/messages/PurchaseOrderExpired"
+      VendorShipmentConfirmed:
+        $ref: "#/components/messages/VendorShipmentConfirmed"
+      SubmissionProcessed:
+        $ref: "#/components/messages/SubmissionProcessed"
+  shippingAndTrackingEvents:
+    address: retailnetwork.shipping-and-tracking.events
+    title: shipping-and-tracking integration topic (consumed)
+    description: |
+      The integration topic of shipping-and-tracking, consumed by the node-performance
+      consumer group read from SHIPPING_AND_TRACKING_CONSUMER_GROUP. Tolerant decoding:
+      unknown types and unknown fields are ignored; every message is
+      deduplicated on the CloudEvents `id` in the inbox.
+    messages:
+      PackageHandedOver:
+        $ref: "#/components/messages/PackageHandedOver"
+  deliveryPromiseEvents:
+    address: retailnetwork.delivery-promise.events
+    title: delivery-promise integration topic (consumed)
+    description: |
+      The integration topic of delivery-promise, consumed by the node-performance
+      consumer group read from DELIVERY_PROMISE_CONSUMER_GROUP. Tolerant decoding:
+      unknown types and unknown fields are ignored; every message is
+      deduplicated on the CloudEvents `id` in the inbox.
+    messages:
+      PromiseKept:
+        $ref: "#/components/messages/PromiseKept"
+      PromiseBroken:
+        $ref: "#/components/messages/PromiseBroken"
+  offerAvailabilityEvents:
+    address: retailnetwork.offer-availability.events
+    title: offer-availability integration topic (consumed)
+    description: |
+      The integration topic of offer-availability, consumed by the node-performance
+      consumer group read from OFFER_AVAILABILITY_CONSUMER_GROUP. Tolerant decoding:
+      unknown types and unknown fields are ignored; every message is
+      deduplicated on the CloudEvents `id` in the inbox.
+    messages:
+      InventoryFeedApplied:
+        $ref: "#/components/messages/InventoryFeedApplied"
+  nodeTopologyEvents:
+    address: retailnetwork.node-topology.events
+    title: node-topology integration topic (consumed)
+    description: |
+      The integration topic of node-topology, consumed by the node-performance
+      consumer group read from NODE_TOPOLOGY_CONSUMER_GROUP. Tolerant decoding:
+      unknown types and unknown fields are ignored; every message is
+      deduplicated on the CloudEvents `id` in the inbox.
+    messages:
+      NodeRegistered:
+        $ref: "#/components/messages/NodeRegistered"
+      NodeOperationalProfileDeclared:
+        $ref: "#/components/messages/NodeOperationalProfileDeclared"
+
+operations:
+  publishNodePerformanceEvents:
+    action: send
+    title: Publish node-performance integration events
+    summary: Publish NodeScorecardUpdated through the transactional outbox.
+    description: |
+      After a Recompute is saved with a changed grade, state or metrics (and
+      not while the scorecard stays PROVISIONAL), the service sends one
+      NodeScorecardUpdated per scorecard to `retailnetwork.node-performance.events`.
+      delivery-promise and order-sourcing consume it; only the 30d window feeds
+      their decisions, the 7d window feeds alerts only (E18).
+    tags:
+      - name: node-performance
+    channel:
+      $ref: "#/channels/nodePerformanceEvents"
+    messages:
+      - $ref: "#/channels/nodePerformanceEvents/messages/NodeScorecardUpdated"
+  publishNodePerformanceAnalytics:
+    action: send
+    title: Publish node-performance analytics events
+    summary: Publish NodeThresholdBreached to the analytics topic only.
+    description: |
+      After a Recompute in which a metric crossed its alert threshold downward
+      is saved, the service sends one NodeThresholdBreached per metric to
+      `retailnetwork.node-performance.analytics`, through the same outbox.
+    tags:
+      - name: node-performance
+    channel:
+      $ref: "#/channels/nodePerformanceAnalytics"
+    messages:
+      - $ref: "#/channels/nodePerformanceAnalytics/messages/NodeThresholdBreached"
+  receiveVendorConnectivityEvents:
+    action: receive
+    title: Receive vendor-connectivity events
+    summary: Consume VendorOnboarded, PurchaseOrderIssued, PurchaseOrderAccepted, PurchaseOrderRejected, PurchaseOrderExpired, VendorShipmentConfirmed, SubmissionProcessed.
+    description: |
+      Consumed from `retailnetwork.vendor-connectivity.events` under the consumer group named by
+      VENDOR_CONNECTIVITY_CONSUMER_GROUP, dispatched on the full CloudEvents
+      `type`, idempotent on the CloudEvents `id` (inbox table
+      `processed_events`). Other types on the topic are ignored.
+    tags:
+      - name: consumed
+    channel:
+      $ref: "#/channels/vendorConnectivityEvents"
+    messages:
+      - $ref: "#/channels/vendorConnectivityEvents/messages/VendorOnboarded"
+      - $ref: "#/channels/vendorConnectivityEvents/messages/PurchaseOrderIssued"
+      - $ref: "#/channels/vendorConnectivityEvents/messages/PurchaseOrderAccepted"
+      - $ref: "#/channels/vendorConnectivityEvents/messages/PurchaseOrderRejected"
+      - $ref: "#/channels/vendorConnectivityEvents/messages/PurchaseOrderExpired"
+      - $ref: "#/channels/vendorConnectivityEvents/messages/VendorShipmentConfirmed"
+      - $ref: "#/channels/vendorConnectivityEvents/messages/SubmissionProcessed"
+  receiveShippingAndTrackingEvents:
+    action: receive
+    title: Receive shipping-and-tracking events
+    summary: Consume PackageHandedOver.
+    description: |
+      Consumed from `retailnetwork.shipping-and-tracking.events` under the consumer group named by
+      SHIPPING_AND_TRACKING_CONSUMER_GROUP, dispatched on the full CloudEvents
+      `type`, idempotent on the CloudEvents `id` (inbox table
+      `processed_events`). Other types on the topic are ignored.
+    tags:
+      - name: consumed
+    channel:
+      $ref: "#/channels/shippingAndTrackingEvents"
+    messages:
+      - $ref: "#/channels/shippingAndTrackingEvents/messages/PackageHandedOver"
+  receiveDeliveryPromiseEvents:
+    action: receive
+    title: Receive delivery-promise events
+    summary: Consume PromiseKept, PromiseBroken.
+    description: |
+      Consumed from `retailnetwork.delivery-promise.events` under the consumer group named by
+      DELIVERY_PROMISE_CONSUMER_GROUP, dispatched on the full CloudEvents
+      `type`, idempotent on the CloudEvents `id` (inbox table
+      `processed_events`). Other types on the topic are ignored.
+    tags:
+      - name: consumed
+    channel:
+      $ref: "#/channels/deliveryPromiseEvents"
+    messages:
+      - $ref: "#/channels/deliveryPromiseEvents/messages/PromiseKept"
+      - $ref: "#/channels/deliveryPromiseEvents/messages/PromiseBroken"
+  receiveOfferAvailabilityEvents:
+    action: receive
+    title: Receive offer-availability events
+    summary: Consume InventoryFeedApplied.
+    description: |
+      Consumed from `retailnetwork.offer-availability.events` under the consumer group named by
+      OFFER_AVAILABILITY_CONSUMER_GROUP, dispatched on the full CloudEvents
+      `type`, idempotent on the CloudEvents `id` (inbox table
+      `processed_events`). Other types on the topic are ignored.
+    tags:
+      - name: consumed
+    channel:
+      $ref: "#/channels/offerAvailabilityEvents"
+    messages:
+      - $ref: "#/channels/offerAvailabilityEvents/messages/InventoryFeedApplied"
+  receiveNodeTopologyEvents:
+    action: receive
+    title: Receive node-topology events
+    summary: Consume NodeRegistered, NodeOperationalProfileDeclared.
+    description: |
+      Consumed from `retailnetwork.node-topology.events` under the consumer group named by
+      NODE_TOPOLOGY_CONSUMER_GROUP, dispatched on the full CloudEvents
+      `type`, idempotent on the CloudEvents `id` (inbox table
+      `processed_events`). Other types on the topic are ignored.
+    tags:
+      - name: consumed
+    channel:
+      $ref: "#/channels/nodeTopologyEvents"
+    messages:
+      - $ref: "#/channels/nodeTopologyEvents/messages/NodeRegistered"
+      - $ref: "#/channels/nodeTopologyEvents/messages/NodeOperationalProfileDeclared"
+
+components:
+  messages:
+    NodeScorecardUpdated:
+      name: NodeScorecardUpdated
+      title: Node scorecard updated
+      summary: A node scorecard was recomputed and its grade, state or metrics changed.
+      description: "`type` = `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated`; subject and key = the scorecardId (`nodeId:window`). Raised by Recompute once the scorecard is saved, and not while a scorecard stays PROVISIONAL. `grade` is `PROVISIONAL` below minObservations (50) and also when a GRADED scorecard falls back below it. Consumers use the 30d window; PROVISIONAL adds no handicap (G20, E18). Metric definitions are in ADR 0002 (A5-A10)."
+      contentType: application/cloudevents+json
+      tags:
+        - name: scorecard
+      payload:
+        $ref: "#/components/schemas/NodeScorecardUpdatedEvent"
+      examples:
+        - name: nodeScorecardUpdated
+          summary: A node scorecard was recomputed and its grade, state or metrics changed.
+          payload:
+            specversion: "1.0"
+            id: "7d0c6a52-3f7e-4b8e-9a51-2a8f0c1d9e44"
+            source: "/retailnetwork/node-performance"
+            type: "com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated"
+            subject: "node-0f3a91:30d"
+            time: "2026-10-22T14:03:00Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:node-performance:events:NodeScorecardUpdated:v1"
+            data:
+              nodeId: "node-0f3a91"
+              window: 30d
+              grade: B
+              onTimeHandoverRate: 0.962
+              lateAckRate: 0.021
+              rejectRate: 0.012
+              expiryRate: 0.004
+              promiseKeptRate: 0.951
+              feedFreshnessP95Minutes: 38
+              observations: 1874
+              computedAt: "2026-10-22T14:03:00Z"
+    NodeThresholdBreached:
+      name: NodeThresholdBreached
+      title: Node threshold breached
+      summary: A metric of a graded scorecard crossed its alert threshold downward.
+      description: "`type` = `com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached`; subject and key = the scorecardId. Analytics only: published ONLY to `retailnetwork.node-performance.analytics`, dataschema stream `analytics`. Raised by Recompute (policy ThresholdAlert), one event per metric that moved from the healthy side of its threshold to the unhealthy side between two GRADED recomputes. `value` is the metric's new value, `threshold` the bound it crossed (ADR 0002, A11)."
+      contentType: application/cloudevents+json
+      tags:
+        - name: scorecard
+      payload:
+        $ref: "#/components/schemas/NodeThresholdBreachedEvent"
+      examples:
+        - name: nodeThresholdBreached
+          summary: A metric of a graded scorecard crossed its alert threshold downward.
+          payload:
+            specversion: "1.0"
+            id: "7d0c6a52-3f7e-4b8e-9a51-2a8f0c1d9e45"
+            source: "/retailnetwork/node-performance"
+            type: "com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached"
+            subject: "node-0f3a91:7d"
+            time: "2026-10-22T14:03:00Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:node-performance:analytics:NodeThresholdBreached:v1"
+            data:
+              nodeId: "node-0f3a91"
+              metric: onTimeHandoverRate
+              value: 0.88
+              threshold: 0.9
+              window: 7d
+    VendorOnboarded:
+      name: VendorOnboarded
+      title: Vendor onboarded
+      summary: A vendor was onboarded.
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.vendoraccount.VendorOnboarded`, from vendor-connectivity. Fields relied on: vendorId. No node scorecard metric reads it: the model gives it no use here (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/VendorOnboardedEvent"
+      examples:
+        - name: vendorOnboarded
+          summary: A vendor was onboarded.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c10"
+            source: "/retailnetwork/vendor-connectivity"
+            type: "com.retailnetwork.partner.vendor-connectivity.vendoraccount.VendorOnboarded"
+            subject: "vendor-77"
+            time: "2026-10-22T08:00:00Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:vendor-connectivity:events:VendorOnboarded:v1"
+            data:
+              vendorId: "vendor-77"
+              name: "Example Vendor"
+              ackWindowMinutes: 120
+    PurchaseOrderIssued:
+      name: PurchaseOrderIssued
+      title: Purchase order issued
+      summary: A purchase order was issued to a node.
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderIssued`, from vendor-connectivity. Fields relied on: poNumber, nodeId, requiredShipBy, ackBy; the envelope `time` is the issue instant, the start of the ack window (ADR 0002, A7). Upserts the local PurchaseOrderFacts; raises no observation. Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/PurchaseOrderIssuedEvent"
+      examples:
+        - name: purchaseOrderIssued
+          summary: A purchase order was issued to a node.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c11"
+            source: "/retailnetwork/vendor-connectivity"
+            type: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderIssued"
+            subject: "po-8a31"
+            time: "2026-10-22T12:00:00Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:vendor-connectivity:events:PurchaseOrderIssued:v1"
+            data:
+              poNumber: "po-8a31"
+              vendorId: "vendor-77"
+              nodeId: "node-0f3a91"
+              assignmentId: "asg-19c2"
+              releaseNo: 1
+              requiredShipBy: "2026-10-23T16:00:00Z"
+              ackBy: "2026-10-22T14:00:00Z"
+              lines: []
+    PurchaseOrderAccepted:
+      name: PurchaseOrderAccepted
+      title: Purchase order accepted
+      summary: A vendor accepted a purchase order.
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderAccepted`, from vendor-connectivity. Fields relied on: poNumber, nodeId, acceptedAt. Records an acknowledgement observation at acceptedAt; late when acceptedAt falls in the last 10% of the ack window (ADR 0002, A7). Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/PurchaseOrderAcceptedEvent"
+      examples:
+        - name: purchaseOrderAccepted
+          summary: A vendor accepted a purchase order.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c12"
+            source: "/retailnetwork/vendor-connectivity"
+            type: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderAccepted"
+            subject: "po-8a31"
+            time: "2026-10-22T12:40:01Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:vendor-connectivity:events:PurchaseOrderAccepted:v1"
+            data:
+              poNumber: "po-8a31"
+              assignmentId: "asg-19c2"
+              releaseNo: 1
+              nodeId: "node-0f3a91"
+              acceptedAt: "2026-10-22T12:40:00Z"
+              transactionId: "txn-5d10"
+    PurchaseOrderRejected:
+      name: PurchaseOrderRejected
+      title: Purchase order rejected
+      summary: A vendor rejected a purchase order.
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderRejected`, from vendor-connectivity. Fields relied on: poNumber, nodeId, rejectedAt; reasonCode is optional and ignored. Records a rejection observation (an acknowledgement for the late-ack check) at rejectedAt. Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/PurchaseOrderRejectedEvent"
+      examples:
+        - name: purchaseOrderRejected
+          summary: A vendor rejected a purchase order.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c13"
+            source: "/retailnetwork/vendor-connectivity"
+            type: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderRejected"
+            subject: "po-8a31"
+            time: "2026-10-22T12:55:01Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:vendor-connectivity:events:PurchaseOrderRejected:v1"
+            data:
+              poNumber: "po-8a31"
+              assignmentId: "asg-19c2"
+              releaseNo: 1
+              nodeId: "node-0f3a91"
+              reasonCode: OUT_OF_STOCK
+              rejectedAt: "2026-10-22T12:55:00Z"
+    PurchaseOrderExpired:
+      name: PurchaseOrderExpired
+      title: Purchase order expired
+      summary: A purchase order was not acknowledged by ackBy.
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderExpired`, from vendor-connectivity. Fields relied on: poNumber, nodeId, ackBy. Records an expiry observation at ackBy (always late for the late-ack rate). Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/PurchaseOrderExpiredEvent"
+      examples:
+        - name: purchaseOrderExpired
+          summary: A purchase order was not acknowledged by ackBy.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c14"
+            source: "/retailnetwork/vendor-connectivity"
+            type: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderExpired"
+            subject: "po-8a31"
+            time: "2026-10-22T14:00:05Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:vendor-connectivity:events:PurchaseOrderExpired:v1"
+            data:
+              poNumber: "po-8a31"
+              assignmentId: "asg-19c2"
+              releaseNo: 1
+              nodeId: "node-0f3a91"
+              ackBy: "2026-10-22T14:00:00Z"
+    VendorShipmentConfirmed:
+      name: VendorShipmentConfirmed
+      title: Vendor shipment confirmed
+      summary: A vendor confirmed it shipped a purchase order.
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.purchaseorder.VendorShipmentConfirmed`, from vendor-connectivity. Fields relied on: poNumber, nodeId, requiredShipBy. Fills the local PurchaseOrderFacts when the issue was not seen; raises no observation. shippedAt is the vendor's own statement and is never used: the handover is measured. Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/VendorShipmentConfirmedEvent"
+      examples:
+        - name: vendorShipmentConfirmed
+          summary: A vendor confirmed it shipped a purchase order.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c15"
+            source: "/retailnetwork/vendor-connectivity"
+            type: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.VendorShipmentConfirmed"
+            subject: "po-8a31"
+            time: "2026-10-23T09:00:02Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:vendor-connectivity:events:VendorShipmentConfirmed:v1"
+            data:
+              poNumber: "po-8a31"
+              assignmentId: "asg-19c2"
+              nodeId: "node-0f3a91"
+              trackingNumbers: ["trk-0001"]
+              shippedAt: "2026-10-23T09:00:00Z"
+              requiredShipBy: "2026-10-23T16:00:00Z"
+    SubmissionProcessed:
+      name: SubmissionProcessed
+      title: Submission processed
+      summary: A vendor submission was processed.
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.submission.SubmissionProcessed`, from vendor-connectivity. No field is relied on: the payload has no nodeId, so it cannot reach a node scorecard (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/SubmissionProcessedEvent"
+      examples:
+        - name: submissionProcessed
+          summary: A vendor submission was processed.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c16"
+            source: "/retailnetwork/vendor-connectivity"
+            type: "com.retailnetwork.partner.vendor-connectivity.submission.SubmissionProcessed"
+            subject: "txn-5d10"
+            time: "2026-10-22T12:40:01Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:vendor-connectivity:events:SubmissionProcessed:v1"
+            data:
+              transactionId: "txn-5d10"
+              vendorId: "vendor-77"
+              kind: ACKNOWLEDGEMENT
+              status: SUCCESS
+              errorCount: 0
+    PackageHandedOver:
+      name: PackageHandedOver
+      title: Package handed over
+      summary: A package was handed over by the vendor node.
+      description: "`type` = `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageHandedOver`, from shipping-and-tracking. Fields relied on: poNumber, nodeId, handedOverAt. Records a handover observation at handedOverAt; on time when handedOverAt is not after the purchase order's requiredShipBy, read from the local PurchaseOrderFacts (ADR 0002, A6). Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/PackageHandedOverEvent"
+      examples:
+        - name: packageHandedOver
+          summary: A package was handed over by the vendor node.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c17"
+            source: "/retailnetwork/shipping-and-tracking"
+            type: "com.retailnetwork.logistics.shipping-and-tracking.journey.PackageHandedOver"
+            subject: "trk-0001"
+            time: "2026-10-23T15:30:01Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:shipping-and-tracking:events:PackageHandedOver:v1"
+            data:
+              trackingNumber: "trk-0001"
+              poNumber: "po-8a31"
+              nodeId: "node-0f3a91"
+              handedOverAt: "2026-10-23T15:30:00Z"
+    PromiseKept:
+      name: PromiseKept
+      title: Promise kept
+      summary: A delivery promise was kept.
+      description: "`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseKept`, from delivery-promise. Fields relied on: nodeId, deliveredAt. Records a kept-promise observation at deliveredAt (ADR 0002, A8). Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/PromiseKeptEvent"
+      examples:
+        - name: promiseKept
+          summary: A delivery promise was kept.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c18"
+            source: "/retailnetwork/delivery-promise"
+            type: "com.retailnetwork.commerce.delivery-promise.promise.PromiseKept"
+            subject: "prm-7f3a21"
+            time: "2026-10-24T01:00:05Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:delivery-promise:events:PromiseKept:v1"
+            data:
+              promiseId: "prm-7f3a21"
+              orderId: "ord-55a901"
+              nodeId: "node-0f3a91"
+              deliveredAt: "2026-10-24T01:00:00Z"
+              deliverByLatest: "2026-10-24T02:00:00Z"
+    PromiseBroken:
+      name: PromiseBroken
+      title: Promise broken
+      summary: A delivery promise was broken.
+      description: "`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseBroken`, from delivery-promise. Fields relied on: nodeId, cause; deliveredAt is optional. LATE counts against the node, LOST and RETURNED do not, and the G33 literals LATE_HANDOVER, VENDOR_REJECT and ACK_EXPIRED count too if a producer ever sends them (ADR 0002, A8). Records a broken-promise observation at deliveredAt, else at the envelope time. Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/PromiseBrokenEvent"
+      examples:
+        - name: promiseBroken
+          summary: A delivery promise was broken.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c19"
+            source: "/retailnetwork/delivery-promise"
+            type: "com.retailnetwork.commerce.delivery-promise.promise.PromiseBroken"
+            subject: "prm-7f3a21"
+            time: "2026-10-24T03:00:05Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:delivery-promise:events:PromiseBroken:v1"
+            data:
+              promiseId: "prm-7f3a21"
+              orderId: "ord-55a901"
+              nodeId: "node-0f3a91"
+              deliveredAt: "2026-10-24T03:00:00Z"
+              deliverByLatest: "2026-10-24T02:00:00Z"
+              lateByMinutes: 60
+              cause: LATE
+    InventoryFeedApplied:
+      name: InventoryFeedApplied
+      title: Inventory feed applied
+      summary: An inventory feed reached APPLIED.
+      description: "`type` = `com.retailnetwork.commerce.offer-availability.inventoryfeed.InventoryFeedApplied`, from offer-availability. Fields relied on: nodeId, appliedAt. Records a feed observation at appliedAt; freshness samples are the gaps between consecutive feeds of the node (ADR 0002, A9). Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/InventoryFeedAppliedEvent"
+      examples:
+        - name: inventoryFeedApplied
+          summary: An inventory feed reached APPLIED.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c20"
+            source: "/retailnetwork/offer-availability"
+            type: "com.retailnetwork.commerce.offer-availability.inventoryfeed.InventoryFeedApplied"
+            subject: "feed-31b7"
+            time: "2026-10-22T13:30:02Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:offer-availability:events:InventoryFeedApplied:v1"
+            data:
+              feedId: "feed-31b7"
+              nodeId: "node-0f3a91"
+              fullUpdate: false
+              lineCount: 250
+              appliedAt: "2026-10-22T13:30:00Z"
+    NodeRegistered:
+      name: NodeRegistered
+      title: Node registered
+      summary: A node was registered in state PROPOSED.
+      description: "`type` = `com.retailnetwork.logistics.node-topology.node.NodeRegistered`, from node-topology. Fields relied on: nodeId. No scorecard metric reads it: a scorecard is built from observed facts, never from a declaration (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/NodeRegisteredEvent"
+      examples:
+        - name: nodeRegistered
+          summary: A node was registered in state PROPOSED.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c21"
+            source: "/retailnetwork/node-topology"
+            type: "com.retailnetwork.logistics.node-topology.node.NodeRegistered"
+            subject: "node-0f3a91"
+            time: "2026-10-22T07:00:00Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:node-topology:events:NodeRegistered:v1"
+            data:
+              nodeId: "node-0f3a91"
+              nodeType: FULFILLMENT_CENTER
+              subtype: null
+              operator: VENDOR
+              vendorId: "vendor-77"
+              vendorNodeCode: "VN-01"
+              regionId: "region-se"
+              timezone: "America/Sao_Paulo"
+              postalCode: "01000-000"
+              countryCode: "BR"
+    NodeOperationalProfileDeclared:
+      name: NodeOperationalProfileDeclared
+      title: Node operational profile declared
+      summary: A new operational profile revision was stored for a node.
+      description: "`type` = `com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared`, from node-topology. Fields relied on: nodeId. The declared profile is what a scorecard is measured against, never an input of it (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/NodeOperationalProfileDeclaredEvent"
+      examples:
+        - name: nodeOperationalProfileDeclared
+          summary: A new operational profile revision was stored for a node.
+          payload:
+            specversion: "1.0"
+            id: "3f6c2a9e-8b1d-4c7a-9e55-0d2f6b7a1c22"
+            source: "/retailnetwork/node-topology"
+            type: "com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared"
+            subject: "node-0f3a91"
+            time: "2026-10-22T07:05:00Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:node-topology:events:NodeOperationalProfileDeclared:v1"
+            data:
+              nodeId: "node-0f3a91"
+              profileRevision: 1
+              timezone: "America/Sao_Paulo"
+              operatingHoursByDay:
+                monday: { start: "06:00", end: "22:00" }
+              holidays: []
+              handlingTimeMinutes: 240
+              cutoffs: []
+              throughputCap: { value: 400, timeUnit: HOUR, unit: ORDER }
+              declaredBy: VENDOR
+
+  schemas:
+    CloudEventEnvelope:
+      type: object
+      required: [specversion, id, source, type, subject, time, datacontenttype, dataschema, data]
+      properties:
+        specversion: { type: string, const: "1.0" }
+        id: { type: string, description: The CloudEvents id; the idempotency key of every consumer. }
+        source: { type: string }
+        type: { type: string }
+        subject: { type: string, description: The aggregate root id of the producer. }
+        time: { type: string, format: date-time }
+        datacontenttype: { type: string, const: application/json }
+        dataschema: { type: string }
+
+    ScorecardWindow:
+      type: string
+      enum: ["7d", "30d"]
+
+    ScorecardGrade:
+      type: string
+      enum: [A, B, C, D, PROVISIONAL]
+
+    NodeScorecardUpdatedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            source: { const: /retailnetwork/node-performance }
+            data:
+              type: object
+              required: [nodeId, window, grade, onTimeHandoverRate, lateAckRate, rejectRate, expiryRate, promiseKeptRate, feedFreshnessP95Minutes, observations, computedAt]
+              properties:
+                nodeId: { type: string }
+                window: { $ref: "#/components/schemas/ScorecardWindow" }
+                grade: { $ref: "#/components/schemas/ScorecardGrade" }
+                onTimeHandoverRate: { type: number, minimum: 0, maximum: 1 }
+                lateAckRate: { type: number, minimum: 0, maximum: 1 }
+                rejectRate: { type: number, minimum: 0, maximum: 1 }
+                expiryRate: { type: number, minimum: 0, maximum: 1 }
+                promiseKeptRate: { type: number, minimum: 0, maximum: 1 }
+                feedFreshnessP95Minutes: { type: integer, minimum: 0 }
+                observations: { type: integer, minimum: 0 }
+                computedAt: { type: string, format: date-time }
+
+    NodeThresholdBreachedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            source: { const: /retailnetwork/node-performance }
+            data:
+              type: object
+              required: [nodeId, metric, value, threshold, window]
+              properties:
+                nodeId: { type: string }
+                metric:
+                  type: string
+                  enum: [onTimeHandoverRate, lateAckRate, rejectRate, expiryRate, promiseKeptRate, feedFreshnessP95Minutes]
+                value: { type: number, minimum: 0 }
+                threshold: { type: number, minimum: 0 }
+                window: { $ref: "#/components/schemas/ScorecardWindow" }
+
+    VendorOnboardedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.vendor-connectivity.vendoraccount.VendorOnboarded" }
+            data:
+              type: object
+              required: [vendorId]
+              properties:
+                vendorId: { type: string }
+    PurchaseOrderIssuedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderIssued" }
+            data:
+              type: object
+              required: [poNumber, nodeId, requiredShipBy, ackBy]
+              properties:
+                poNumber: { type: string }
+                nodeId: { type: string }
+                requiredShipBy: { type: string, format: date-time }
+                ackBy: { type: string, format: date-time }
+    PurchaseOrderAcceptedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderAccepted" }
+            data:
+              type: object
+              required: [poNumber, nodeId, acceptedAt]
+              properties:
+                poNumber: { type: string }
+                nodeId: { type: string }
+                acceptedAt: { type: string, format: date-time }
+    PurchaseOrderRejectedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderRejected" }
+            data:
+              type: object
+              required: [poNumber, nodeId, rejectedAt]
+              properties:
+                poNumber: { type: string }
+                nodeId: { type: string }
+                rejectedAt: { type: string, format: date-time }
+                reasonCode: { type: string }
+    PurchaseOrderExpiredEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.PurchaseOrderExpired" }
+            data:
+              type: object
+              required: [poNumber, nodeId, ackBy]
+              properties:
+                poNumber: { type: string }
+                nodeId: { type: string }
+                ackBy: { type: string, format: date-time }
+    VendorShipmentConfirmedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.vendor-connectivity.purchaseorder.VendorShipmentConfirmed" }
+            data:
+              type: object
+              required: [poNumber, nodeId, requiredShipBy]
+              properties:
+                poNumber: { type: string }
+                nodeId: { type: string }
+                requiredShipBy: { type: string, format: date-time }
+    SubmissionProcessedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.vendor-connectivity.submission.SubmissionProcessed" }
+            data:
+              type: object
+              properties:
+                transactionId: { type: string }
+    PackageHandedOverEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.logistics.shipping-and-tracking.journey.PackageHandedOver" }
+            data:
+              type: object
+              required: [poNumber, nodeId, handedOverAt]
+              properties:
+                poNumber: { type: string }
+                nodeId: { type: string }
+                handedOverAt: { type: string, format: date-time }
+    PromiseKeptEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.commerce.delivery-promise.promise.PromiseKept" }
+            data:
+              type: object
+              required: [nodeId, deliveredAt]
+              properties:
+                nodeId: { type: string }
+                deliveredAt: { type: string, format: date-time }
+    PromiseBrokenEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.commerce.delivery-promise.promise.PromiseBroken" }
+            data:
+              type: object
+              required: [nodeId, cause]
+              properties:
+                nodeId: { type: string }
+                deliveredAt: { type: string, format: date-time }
+                cause: { type: string }
+    InventoryFeedAppliedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.commerce.offer-availability.inventoryfeed.InventoryFeedApplied" }
+            data:
+              type: object
+              required: [nodeId, appliedAt]
+              properties:
+                nodeId: { type: string }
+                appliedAt: { type: string, format: date-time }
+    NodeRegisteredEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.logistics.node-topology.node.NodeRegistered" }
+            data:
+              type: object
+              required: [nodeId]
+              properties:
+                nodeId: { type: string }
+    NodeOperationalProfileDeclaredEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared" }
+            data:
+              type: object
+              required: [nodeId]
+              properties:
+                nodeId: { type: string }

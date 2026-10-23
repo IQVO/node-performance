@@ -43,4 +43,6 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerFactSteps(sc, w)
 	registerOutcomeSteps(sc, w)
 	registerScorecardSteps(sc, w)
+	registerReadSteps(sc, w)
+	registerEventPayloadSteps(sc, w)
 }

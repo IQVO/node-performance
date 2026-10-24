@@ -1,6 +1,6 @@
 # Default values for node-performance.
 #
-# One component: the api (cmd/api: REST, five Kafka consumers, the recompute
+# One component: the api (cmd/api: REST, six Kafka consumers, the recompute
 # scheduler and the outbox relay in ONE process). No MCP server, frontend,
 # projector or reports binary exists in this service.
 
@@ -107,7 +107,7 @@ config:
   # listener. Whole seconds ("5s" or "5"); "0" disables. The chart refuses a
   # terminationGracePeriodSeconds below this + 35.
   shutdownDrainDelay: "5s"
-  # The five consumer group ids. REQUIRED: the chart refuses to render an
+  # The six consumer group ids. REQUIRED: the chart refuses to render an
   # empty one and the binary refuses to boot without it. Use a STABLE,
   # service-prefixed id (never the pod name), so a rescheduled pod resumes
   # from its committed offsets.
@@ -116,6 +116,7 @@ config:
   deliveryPromiseConsumerGroup: ""       # DELIVERY_PROMISE_CONSUMER_GROUP
   offerAvailabilityConsumerGroup: ""     # OFFER_AVAILABILITY_CONSUMER_GROUP
   nodeTopologyConsumerGroup: ""          # NODE_TOPOLOGY_CONSUMER_GROUP
+  sellerInboundConsumerGroup: ""         # SELLER_INBOUND_CONSUMER_GROUP
 
 # The chart refuses to render unless database.url or database.existingSecret
 # is set. DATABASE_URL always reaches the pod through a secretKeyRef, never
@@ -134,7 +135,7 @@ database:
 # The chart refuses to render without it. Comma-separated host:port list.
 # Produced: retailnetwork.node-performance.events and
 # retailnetwork.node-performance.analytics. Consumed: the vendor-connectivity,
-# shipping-and-tracking, delivery-promise, offer-availability and
+# shipping-and-tracking, delivery-promise, offer-availability, seller-inbound and
 # node-topology topics.
 kafka:
   brokers: ""

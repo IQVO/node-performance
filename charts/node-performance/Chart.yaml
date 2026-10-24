@@ -1,6 +1,6 @@
 apiVersion: v2
 name: node-performance
-description: Node Performance - delivery-node scorecards (NodeScorecardUpdated, NodeThresholdBreached) computed from five consumed retail-network topics; publishes on retailnetwork.node-performance.events and retailnetwork.node-performance.analytics
+description: Node Performance - delivery-node scorecards (NodeScorecardUpdated, NodeThresholdBreached) computed from six consumed retail-network topics; publishes on retailnetwork.node-performance.events and retailnetwork.node-performance.analytics
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

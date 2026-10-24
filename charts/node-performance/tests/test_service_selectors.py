@@ -32,6 +32,7 @@ GROUPS = {
     "deliveryPromiseConsumerGroup": "node-performance-delivery-promise",
     "offerAvailabilityConsumerGroup": "node-performance-offer-availability",
     "nodeTopologyConsumerGroup": "node-performance-node-topology",
+    "sellerInboundConsumerGroup": "node-performance-seller-inbound",
 }
 
 
@@ -62,6 +63,7 @@ API_ENV = (
     "DATABASE_URL", "MIGRATIONS_DATABASE_URL", "KAFKA_BROKERS",
     "VENDOR_CONNECTIVITY_CONSUMER_GROUP", "SHIPPING_AND_TRACKING_CONSUMER_GROUP",
     "DELIVERY_PROMISE_CONSUMER_GROUP", "OFFER_AVAILABILITY_CONSUMER_GROUP", "NODE_TOPOLOGY_CONSUMER_GROUP",
+    "SELLER_INBOUND_CONSUMER_GROUP",
     "HTTP_ADDR", "RECOMPUTE_INTERVAL", "OUTBOX_RELAY_INTERVAL", "OUTBOX_MAX_ATTEMPTS",
     "SHUTDOWN_DRAIN_DELAY", "LOG_LEVEL",
 )
@@ -203,7 +205,7 @@ def main() -> int:
 
     print("PASS: the api Service selects exactly one Deployment (the api); HPA, Ingress and HTTPRoute are off by default "
           "and render when enabled; every env var cmd/api reads is rendered and no *_MODE is; the chart refuses to render "
-          "without a database source, brokers or any of the five consumer groups, with a *_MODE in extraEnv, or with a "
+          "without a database source, brokers or any of the six consumer groups, with a *_MODE in extraEnv, or with a "
           "grace period under 40s")
     return 0
 

@@ -24,3 +24,4 @@ data:
   DELIVERY_PROMISE_CONSUMER_GROUP: {{ .Values.config.deliveryPromiseConsumerGroup | quote }}
   OFFER_AVAILABILITY_CONSUMER_GROUP: {{ .Values.config.offerAvailabilityConsumerGroup | quote }}
   NODE_TOPOLOGY_CONSUMER_GROUP: {{ .Values.config.nodeTopologyConsumerGroup | quote }}
+  SELLER_INBOUND_CONSUMER_GROUP: {{ .Values.config.sellerInboundConsumerGroup | quote }}

@@ -192,3 +192,10 @@ Deployment (always rendered) includes it, so a mis-set release fails
 {{- include "node-performance.requireGracePeriod" . -}}
 {{- include "node-performance.requireHTTPPort" . -}}
 {{- end -}}
+
+{{/*
+Fully qualified name of the MCP server Deployment/Service (cmd/mcp, ADR 0007).
+*/}}
+{{- define "node-performance.mcpFullname" -}}
+{{- include "node-performance.fullname" . }}-mcp
+{{- end }}

@@ -82,7 +82,7 @@ func TestConsumersAreBuiltForEveryTopicAndNeverDialAtBoot(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := config{brokers: []string{"127.0.0.1:1"}}
 	workers, closeAll := startConsumers(ctx, cfg, usecases.Intake{}, logger)
-	if len(workers) != 5 {
+	if len(workers) != 6 {
 		t.Fatalf("%d consumers", len(workers))
 	}
 	cancel()

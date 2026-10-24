@@ -35,6 +35,7 @@ GROUPS = {
     "deliveryPromiseConsumerGroup": "node-performance-delivery-promise",
     "offerAvailabilityConsumerGroup": "node-performance-offer-availability",
     "nodeTopologyConsumerGroup": "node-performance-node-topology",
+    "sellerInboundConsumerGroup": "node-performance-seller-inbound",
 }
 
 
@@ -70,6 +71,7 @@ API_ENV = (
     "DATABASE_URL", "MIGRATIONS_DATABASE_URL", "KAFKA_BROKERS",
     "VENDOR_CONNECTIVITY_CONSUMER_GROUP", "SHIPPING_AND_TRACKING_CONSUMER_GROUP",
     "DELIVERY_PROMISE_CONSUMER_GROUP", "OFFER_AVAILABILITY_CONSUMER_GROUP", "NODE_TOPOLOGY_CONSUMER_GROUP",
+    "SELLER_INBOUND_CONSUMER_GROUP",
     "HTTP_ADDR", "RECOMPUTE_INTERVAL", "OUTBOX_RELAY_INTERVAL", "OUTBOX_MAX_ATTEMPTS",
     "SHUTDOWN_DRAIN_DELAY", "LOG_LEVEL",
 )
@@ -269,7 +271,7 @@ def main() -> int:
     print("PASS: every Service selects exactly one Deployment (api, mcp, frontend); mcp and frontend are off by "
           "default and render when enabled; every env var cmd/api and cmd/mcp read is rendered, no *_MODE is, the mcp "
           "Deployment gets no Kafka env and the frontend none at all; the chart refuses to render without a database "
-          "source, brokers or any of the five consumer groups, with a *_MODE in extraEnv, or with a grace period "
+          "source, brokers or any of the six consumer groups, with a *_MODE in extraEnv, or with a grace period "
           "under 40s")
     return 0
 

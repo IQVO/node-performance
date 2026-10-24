@@ -49,7 +49,7 @@ func (e testEncoder) Encode(ev shared.Event) (outbox.Message, error) {
 func fixtureOver(pool *pgxpool.Pool, enc outbox.Encoder) repocontract.Fixture {
 	return repocontract.Fixture{
 		Scorecards: postgres.NewScorecardRepo(pool), Reader: postgres.NewReader(pool),
-		Facts: postgres.NewPurchaseOrderFactsRepo(pool), Inbox: postgres.NewInboxRepo(pool),
+		Facts: postgres.NewPurchaseOrderFactsRepo(pool), Inbound: postgres.NewInboundRepo(pool), InboundReader: postgres.NewInboundRepo(pool), Inbox: postgres.NewInboxRepo(pool),
 		Outbox: postgres.NewOutboxRepo(pool, enc), UoW: postgres.NewUnitOfWork(pool),
 		OutboxCount: func(ctx context.Context) (int, error) {
 			var n int

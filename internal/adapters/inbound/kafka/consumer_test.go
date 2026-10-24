@@ -147,11 +147,11 @@ func TestAnAcknowledgementBeforeItsIssueIsTransient(t *testing.T) {
 	}
 }
 
-func TestNewConsumersWiresFiveTopicsAndNeverDials(t *testing.T) {
+func TestNewConsumersWiresSixTopicsAndNeverDials(t *testing.T) {
 	r := newRig()
-	groups := Groups{VendorConnectivity: "g1", ShippingAndTracking: "g2", DeliveryPromise: "g3", OfferAvailability: "g4", NodeTopology: "g5"}
+	groups := Groups{VendorConnectivity: "g1", ShippingAndTracking: "g2", DeliveryPromise: "g3", OfferAvailability: "g4", NodeTopology: "g5", SellerInbound: "g6"}
 	consumers := NewConsumers([]string{"127.0.0.1:1"}, groups, r.intake, nil)
-	want := []string{VendorConnectivityTopic, ShippingAndTrackingTopic, DeliveryPromiseTopic, OfferAvailabilityTopic, NodeTopologyTopic}
+	want := []string{VendorConnectivityTopic, ShippingAndTrackingTopic, DeliveryPromiseTopic, OfferAvailabilityTopic, NodeTopologyTopic, SellerInboundTopic}
 	if len(consumers) != len(want) {
 		t.Fatalf("%d consumers", len(consumers))
 	}
@@ -164,8 +164,8 @@ func TestNewConsumersWiresFiveTopicsAndNeverDials(t *testing.T) {
 		}
 	}
 	if got := len(VendorHandlers(r.intake, nil)) + len(ShippingHandlers(r.intake, nil)) + len(DeliveryPromiseHandlers(r.intake, nil)) +
-		len(OfferAvailabilityHandlers(r.intake, nil)) + len(NodeTopologyHandlers(r.intake, nil)); got != 13 {
-		t.Fatalf("%d handled types, the contract lists 13", got)
+		len(OfferAvailabilityHandlers(r.intake, nil)) + len(NodeTopologyHandlers(r.intake, nil)) + len(SellerInboundHandlers(r.intake, nil)); got != 15 {
+		t.Fatalf("%d handled types, the contract lists 15", got)
 	}
 	_ = scorecard.MinObservations
 }

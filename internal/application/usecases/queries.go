@@ -21,7 +21,13 @@ const (
 )
 
 // Queries are the two read use cases of apis/openapi.yaml.
-type Queries struct{ Reader ports.ScorecardReader }
+type Queries struct {
+	Reader ports.ScorecardReader
+	// Inbound and Clock add the informational inbound metrics to the metrics
+	// of each scorecard (ADR 0009). A nil Inbound leaves them out.
+	Inbound ports.InboundReader
+	Clock   ports.Clock
+}
 
 // ListByGradeInput is the validated-on-arrival input of ListScorecardsByGrade.
 type ListByGradeInput struct {
@@ -50,6 +56,9 @@ func (q Queries) GetScorecard(ctx context.Context, nodeID string) (views.NodeSco
 	if len(list) == 0 {
 		return views.NodeScorecards{}, fmt.Errorf("%w: no scorecard for node %s", ports.ErrNotFound, nodeID)
 	}
+	if err := q.addInbound(ctx, list); err != nil {
+		return views.NodeScorecards{}, err
+	}
 	return views.NodeScorecards{NodeID: string(id), Scorecards: list}, nil
 }
 
@@ -59,7 +68,42 @@ func (q Queries) ListScorecardsByGrade(ctx context.Context, in ListByGradeInput)
 	if err != nil {
 		return views.ScorecardPage{}, err
 	}
-	return q.Reader.ByGrade(ctx, filter)
+	page, err := q.Reader.ByGrade(ctx, filter)
+	if err != nil {
+		return views.ScorecardPage{}, err
+	}
+	if err := q.addInbound(ctx, page.Items); err != nil {
+		return views.ScorecardPage{}, err
+	}
+	return page, nil
+}
+
+// addInbound fills the two inbound metrics of every scorecard in place, from
+// the receipts joined to their shipments inside each scorecard's own window.
+func (q Queries) addInbound(ctx context.Context, items []views.Scorecard) error {
+	if q.Inbound == nil || len(items) == 0 {
+		return nil
+	}
+	now := q.Clock.Now().UTC()
+	seen := map[scorecard.NodeID]bool{}
+	var nodes []scorecard.NodeID
+	for _, it := range items {
+		if n := scorecard.NodeID(it.NodeID); !seen[n] {
+			seen[n] = true
+			nodes = append(nodes, n)
+		}
+	}
+	// The longest window bounds the read; each scorecard then applies its own.
+	byNode, err := q.Inbound.Observations(ctx, nodes, now.Add(-scorecard.Window30d.Duration()))
+	if err != nil {
+		return fmt.Errorf("read inbound observations: %w", err)
+	}
+	for i := range items {
+		m := scorecard.ComputeInbound(byNode[scorecard.NodeID(items[i].NodeID)], now, scorecard.Window(items[i].Window))
+		items[i].Metrics.InboundTimelinessP95Minutes = m.TimelinessP95Minutes
+		items[i].Metrics.InboundAccuracyRate = m.AccuracyRate
+	}
+	return nil
 }
 
 func listFilter(in ListByGradeInput) (repository.ScorecardFilter, error) {

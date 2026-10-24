@@ -36,7 +36,7 @@ func newEnv(tweak ...func(*usecases.Deps)) env {
 	s := memory.NewStore()
 	clock := memory.NewClock(base)
 	d := usecases.Deps{
-		Scorecards: s.Scorecards(), Facts: s.Facts(), Inbox: s.Inbox(), Outbox: s.Outbox(),
+		Scorecards: s.Scorecards(), Facts: s.Facts(), Inbound: s.Inbound(), Inbox: s.Inbox(), Outbox: s.Outbox(),
 		UoW: s.UnitOfWork(), Clock: clock,
 	}
 	for _, f := range tweak {
@@ -44,7 +44,7 @@ func newEnv(tweak ...func(*usecases.Deps)) env {
 	}
 	return env{
 		store: s, clock: clock, deps: d, intake: usecases.NewIntake(d), recompute: usecases.NewRecompute(d),
-		queries: usecases.Queries{Reader: s.Reader()},
+		queries: usecases.Queries{Reader: s.Reader(), Inbound: s.Inbound(), Clock: clock},
 	}
 }
 

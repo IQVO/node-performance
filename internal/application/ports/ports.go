@@ -92,3 +92,26 @@ type UnitOfWork interface {
 type Clock interface {
 	Now() time.Time
 }
+
+// InboundRepository keeps the two local read models of the inbound metrics
+// (ADR 0009): the shipped instant of each shipment (from seller-inbound) and
+// the carton counts of each receipt (from vendor-connectivity). Both are
+// keyed by shipmentId and the first fact stored wins, so a redelivery or a
+// second report never moves a stored value and a receipt is counted once. A
+// receipt that arrives before its shipment simply stays stored until the
+// shipment arrives; the read side joins the two.
+type InboundRepository interface {
+	// SaveShipment stores the shipped instant and reports whether it was new.
+	SaveShipment(ctx context.Context, s scorecard.InboundShipment) (bool, error)
+	// SaveReceipt stores the receipt and reports whether it was new (the first
+	// receipt of a shipment wins).
+	SaveReceipt(ctx context.Context, r scorecard.InboundReceipt) (bool, error)
+}
+
+// InboundReader is the read side of the inbound metrics.
+type InboundReader interface {
+	// Observations returns, per node, the receipts received after `after` that
+	// are already joined to their shipment. Parked receipts (no shipment yet)
+	// are not returned. Nodes without data are absent from the map.
+	Observations(ctx context.Context, nodes []scorecard.NodeID, after time.Time) (map[scorecard.NodeID][]scorecard.InboundObservation, error)
+}

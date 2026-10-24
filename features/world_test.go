@@ -51,10 +51,10 @@ func (w *world) reset() {
 	w.store = s
 	w.clock = memory.NewClock(bddNow)
 	deps := usecases.Deps{
-		Scorecards: s.Scorecards(), Facts: s.Facts(), Inbox: s.Inbox(), Outbox: s.Outbox(),
+		Scorecards: s.Scorecards(), Facts: s.Facts(), Inbound: s.Inbound(), Inbox: s.Inbox(), Outbox: s.Outbox(),
 		UoW: s.UnitOfWork(), Clock: w.clock,
 	}
-	w.intake, w.recompute, w.queries = usecases.NewIntake(deps), usecases.NewRecompute(deps), usecases.Queries{Reader: s.Reader()}
+	w.intake, w.recompute, w.queries = usecases.NewIntake(deps), usecases.NewRecompute(deps), usecases.Queries{Reader: s.Reader(), Inbound: s.Inbound(), Clock: w.clock}
 	w.orders, w.seq = map[string]purchaseOrder{}, 0
 	w.lastOutcome, w.lastErr, w.outboxBefore = "", nil, 0
 }

@@ -23,6 +23,8 @@ const (
 	deliveryPromiseTypePrefix = "com.retailnetwork.commerce.delivery-promise."
 	offerAvailabilityPrefix   = "com.retailnetwork.commerce.offer-availability."
 	nodeTopologyTypePrefix    = "com.retailnetwork.logistics.node-topology."
+	SellerInboundTopic        = "retailnetwork.seller-inbound.events"
+	sellerInboundTypePrefix   = "com.retailnetwork.partner.seller-inbound."
 )
 
 // The FULL CloudEvents types this service reacts to.
@@ -38,6 +40,8 @@ const (
 	TypePromiseKept                    = deliveryPromiseTypePrefix + "promise.PromiseKept"
 	TypePromiseBroken                  = deliveryPromiseTypePrefix + "promise.PromiseBroken"
 	TypeInventoryFeedApplied           = offerAvailabilityPrefix + "inventoryfeed.InventoryFeedApplied"
+	TypeInboundReceiptSubmitted        = vendorTypePrefix + "inboundreceipt.InboundReceiptSubmitted"
+	TypeInboundShipmentShipped         = sellerInboundTypePrefix + "inboundshipment.InboundShipmentShipped"
 	TypeNodeRegistered                 = nodeTopologyTypePrefix + "node.NodeRegistered"
 	TypeNodeOperationalProfileDeclared = nodeTopologyTypePrefix + "node.NodeOperationalProfileDeclared"
 )
@@ -49,6 +53,7 @@ type Groups struct {
 	DeliveryPromise     string
 	OfferAvailability   string
 	NodeTopology        string
+	SellerInbound       string
 }
 
 // ref builds the usecases envelope of a consumed event.
@@ -97,6 +102,19 @@ type (
 		NodeID      string    `json:"nodeId"`
 		DeliveredAt time.Time `json:"deliveredAt"`
 		Cause       string    `json:"cause"`
+	}
+	inboundReceiptData struct {
+		NodeID     string    `json:"nodeId"`
+		ShipmentID string    `json:"shipmentId"`
+		ReceivedAt time.Time `json:"receivedAt"`
+		Cartons    []struct {
+			Status string `json:"status"`
+		} `json:"cartons"`
+	}
+	inboundShippedData struct {
+		NodeID     string    `json:"nodeId"`
+		ShipmentID string    `json:"shipmentId"`
+		ShippedAt  time.Time `json:"shippedAt"`
 	}
 	feedData struct {
 		NodeID    string    `json:"nodeId"`
@@ -153,6 +171,13 @@ func VendorHandlers(intake usecases.Intake, logger *slog.Logger) map[string]Hand
 		TypeVendorShipmentConfirmed: handle(logger, func(ctx context.Context, e ce.Event, d shipmentData) (usecases.Outcome, error) {
 			return intake.ShipmentConfirmed(ctx, usecases.ShipmentConfirmed{Ref: ref(e), PoNumber: d.PoNumber, NodeID: d.NodeID, RequiredShipBy: d.RequiredShipBy})
 		}),
+		TypeInboundReceiptSubmitted: handle(logger, func(ctx context.Context, e ce.Event, d inboundReceiptData) (usecases.Outcome, error) {
+			statuses := make([]string, len(d.Cartons))
+			for i, c := range d.Cartons {
+				statuses[i] = c.Status
+			}
+			return intake.InboundReceiptSubmitted(ctx, usecases.InboundReceiptSubmitted{Ref: ref(e), ShipmentID: d.ShipmentID, NodeID: d.NodeID, ReceivedAt: d.ReceivedAt, CartonStatuses: statuses})
+		}),
 		TypeVendorOnboarded:     noEffect(logger, intake),
 		TypeSubmissionProcessed: noEffect(logger, intake),
 	}
@@ -197,7 +222,17 @@ func NodeTopologyHandlers(intake usecases.Intake, logger *slog.Logger) map[strin
 	}
 }
 
-// NewConsumers builds the five consumers over brokers, each under its own group.
+// SellerInboundHandlers returns the seller-inbound handlers: only the shipped
+// instant is relied on (ADR 0009).
+func SellerInboundHandlers(intake usecases.Intake, logger *slog.Logger) map[string]HandlerFunc {
+	return map[string]HandlerFunc{
+		TypeInboundShipmentShipped: handle(logger, func(ctx context.Context, e ce.Event, d inboundShippedData) (usecases.Outcome, error) {
+			return intake.InboundShipmentShipped(ctx, usecases.InboundShipmentShipped{Ref: ref(e), ShipmentID: d.ShipmentID, NodeID: d.NodeID, ShippedAt: d.ShippedAt})
+		}),
+	}
+}
+
+// NewConsumers builds the six consumers over brokers, each under its own group.
 // Nothing dials Kafka here.
 func NewConsumers(brokers []string, groups Groups, intake usecases.Intake, logger *slog.Logger) []*Consumer {
 	logger = defaultLogger(logger)
@@ -207,5 +242,6 @@ func NewConsumers(brokers []string, groups Groups, intake usecases.Intake, logge
 		newConsumer("delivery-promise consumer", brokers, DeliveryPromiseTopic, groups.DeliveryPromise, DeliveryPromiseHandlers(intake, logger), logger),
 		newConsumer("offer-availability consumer", brokers, OfferAvailabilityTopic, groups.OfferAvailability, OfferAvailabilityHandlers(intake, logger), logger),
 		newConsumer("node-topology consumer", brokers, NodeTopologyTopic, groups.NodeTopology, NodeTopologyHandlers(intake, logger), logger),
+		newConsumer("seller-inbound consumer", brokers, SellerInboundTopic, groups.SellerInbound, SellerInboundHandlers(intake, logger), logger),
 	}
 }

@@ -4,7 +4,7 @@ Bounded context **Node Performance** (Supporting, partner tier) measures every n
 network against what it declared and what was asked of it — acknowledgement latency, rejections,
 on-time handover against `requiredShipBy`, promise-kept rate and inventory feed freshness — over
 rolling 7-day and 30-day windows, and grades the node (`A`–`D` from 50 observations, `PROVISIONAL`
-below). It consumes five sibling event topics, keeps two scorecards per node
+below). It consumes six sibling event topics, keeps two scorecards per node
 (`onTimeHandoverRate`, `lateAckRate`, `rejectRate`, `expiryRate`, `promiseKeptRate`,
 `feedFreshnessP95Minutes`), publishes `NodeScorecardUpdated` / `NodeThresholdBreached` through a
 transactional outbox and serves two read-only REST routes (`README.md`, `apis/openapi.yaml`,
@@ -19,8 +19,8 @@ any company (`README.md` disclaimer).
   - **REST** on `HTTP_ADDR` (default `:8080`): chi, `GET /scorecards/{nodeId}`,
     `GET /scorecards?grade=&window=&limit=&after=`, plus the probes. Reads only, no
     authentication, no state-changing route (`internal/adapters/inbound/http`).
-  - **Five Kafka consumers** (vendor-connectivity, shipping-and-tracking, delivery-promise,
-    offer-availability, node-topology), one message at a time, offset committed only after the
+  - **Six Kafka consumers** (vendor-connectivity, shipping-and-tracking, delivery-promise,
+    offer-availability, node-topology, seller-inbound), one message at a time, offset committed only after the
     intake use case returned (`internal/adapters/inbound/kafka/consumer.go`). No sibling REST
     calls: facts arrive only over Kafka (`docs/adr/0003`).
   - **Recompute scheduler**: runs `Recompute` once at boot, then every `RECOMPUTE_INTERVAL`
@@ -91,6 +91,7 @@ the ConfigMap carries all of them except the two DSNs):
 | `DELIVERY_PROMISE_CONSUMER_GROUP` | required | `config.deliveryPromiseConsumerGroup` | group id for the delivery-promise topic |
 | `OFFER_AVAILABILITY_CONSUMER_GROUP` | required | `config.offerAvailabilityConsumerGroup` | group id for the offer-availability topic |
 | `NODE_TOPOLOGY_CONSUMER_GROUP` | required | `config.nodeTopologyConsumerGroup` | group id for the node-topology topic |
+| `SELLER_INBOUND_CONSUMER_GROUP` | required | `config.sellerInboundConsumerGroup` | group id for the seller-inbound topic |
 | `HTTP_ADDR` | `:8080` | `config.httpAddr` | listen address; port must equal `service.targetPort` |
 | `RECOMPUTE_INTERVAL` | `1m` | `config.recomputeInterval` | recompute scheduler tick (Go duration or plain seconds) |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | `config.outboxRelayInterval` | relay poll interval |
@@ -98,7 +99,7 @@ the ConfigMap carries all of them except the two DSNs):
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | `config.shutdownDrainDelay` | wait after flipping `/readyz`; `0` disables |
 | `LOG_LEVEL` | `info` | `config.logLevel` | `debug`/`info`/`warn`/`error` |
 
-The chart refuses to render without the DSN source, `kafka.brokers` and the five group ids, and
+The chart refuses to render without the DSN source, `kafka.brokers` and the six group ids, and
 refuses a `terminationGracePeriodSeconds` below `config.shutdownDrainDelay` + 35s
 (`charts/node-performance/templates/_helpers.tpl`).
 

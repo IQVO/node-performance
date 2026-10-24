@@ -52,7 +52,7 @@ func boot(t *testing.T) (string, func()) {
 	for k, v := range map[string]string{
 		"DATABASE_URL": pgtest.FreshURL(t), "KAFKA_BROKERS": brokers, "HTTP_ADDR": addr,
 		envVendorGroup: prefix + "-vendor", envShippingGroup: prefix + "-shipping", envPromiseGroup: prefix + "-promise",
-		envOfferGroup: prefix + "-offer", envTopologyGroup: prefix + "-topology",
+		envOfferGroup: prefix + "-offer", envTopologyGroup: prefix + "-topology", envSellerGroup: prefix + "-seller",
 		envRecomputeInterval: "500ms", envRelayInterval: "100ms", envShutdownDrainWait: "0", envLogLevel: "warn",
 	} {
 		t.Setenv(k, v)

@@ -22,9 +22,10 @@ Scorecard events are relayed from the transactional outbox to
 retailnetwork.node-performance.events and retailnetwork.node-performance.analytics
 ({{ .Values.kafka.brokers }}). Postgres and Kafka are the only runtime.
 
-The five consumers are ON, each under a stable group id:
+The six consumers are ON, each under a stable group id:
   vendor-connectivity    group {{ .Values.config.vendorConnectivityConsumerGroup }}
   shipping-and-tracking  group {{ .Values.config.shippingAndTrackingConsumerGroup }}
   delivery-promise       group {{ .Values.config.deliveryPromiseConsumerGroup }}
   offer-availability     group {{ .Values.config.offerAvailabilityConsumerGroup }}
   node-topology          group {{ .Values.config.nodeTopologyConsumerGroup }}
+  seller-inbound         group {{ .Values.config.sellerInboundConsumerGroup }}

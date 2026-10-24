@@ -310,3 +310,59 @@ func (i Intake) recordIn(ctx context.Context, node scorecard.NodeID, w scorecard
 	}
 	return true, i.Scorecards.Save(ctx, sc)
 }
+
+// InboundShipmentShipped is the relied-on content of seller-inbound's
+// InboundShipmentShipped (unknown fields are ignored).
+type InboundShipmentShipped struct {
+	Ref        EventRef
+	ShipmentID string
+	NodeID     string
+	ShippedAt  time.Time
+}
+
+// InboundReceiptSubmitted is the relied-on content of vendor-connectivity's
+// InboundReceiptSubmitted: the status of each reported carton.
+type InboundReceiptSubmitted struct {
+	Ref            EventRef
+	ShipmentID     string
+	NodeID         string
+	ReceivedAt     time.Time
+	CartonStatuses []string
+}
+
+// InboundShipmentShipped keeps the shipped instant of a shipment. It records no
+// scorecard observation: the receipt joined to it does (ADR 0009). A shipment
+// stored already (the first instant wins) is a duplicate.
+func (i Intake) InboundShipmentShipped(ctx context.Context, in InboundShipmentShipped) (Outcome, error) {
+	return i.apply(ctx, in.Ref, func(ctx context.Context) (Outcome, error) {
+		sh, err := scorecard.NewInboundShipment(in.ShipmentID, scorecard.NodeID(in.NodeID), in.ShippedAt)
+		if err != nil {
+			return "", err
+		}
+		return i.inboundOutcome(i.Inbound.SaveShipment(ctx, sh))
+	})
+}
+
+// InboundReceiptSubmitted keeps the carton counts of a receipt. A receipt whose
+// shipment was not seen yet is parked: it is stored, joined by the read side
+// the moment the shipment arrives, and never counted twice (the first receipt
+// of a shipment wins).
+func (i Intake) InboundReceiptSubmitted(ctx context.Context, in InboundReceiptSubmitted) (Outcome, error) {
+	return i.apply(ctx, in.Ref, func(ctx context.Context) (Outcome, error) {
+		rc, err := scorecard.NewInboundReceipt(in.ShipmentID, scorecard.NodeID(in.NodeID), in.ReceivedAt, in.CartonStatuses)
+		if err != nil {
+			return "", err
+		}
+		return i.inboundOutcome(i.Inbound.SaveReceipt(ctx, rc))
+	})
+}
+
+func (i Intake) inboundOutcome(isNew bool, err error) (Outcome, error) {
+	if err != nil {
+		return "", err
+	}
+	if !isNew {
+		return OutcomeDuplicate, nil
+	}
+	return OutcomeApplied, nil
+}

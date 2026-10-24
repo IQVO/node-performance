@@ -16,11 +16,15 @@ import (
 // allTables is every table the migrations create, golang-migrate's own
 // bookkeeping table excluded.
 var allTables = []string{
-	"idempotency_keys", "outbox_events", "processed_events", "purchase_order_facts", "scorecard_observations", "scorecards",
+	"idempotency_keys", "inbound_receipts", "inbound_shipments", "outbox_events", "processed_events", "purchase_order_facts", "scorecard_observations", "scorecards",
 }
 
-// coreTables are the tables of migration 0001; 0002 adds the other three.
+// coreTables are the tables of migration 0001; 0002 adds the next three and
+// 0003 the two inbound read models.
 var coreTables = []string{"purchase_order_facts", "scorecard_observations", "scorecards"}
+
+// withoutInbound is every table before migration 0003.
+var withoutInbound = []string{"idempotency_keys", "outbox_events", "processed_events", "purchase_order_facts", "scorecard_observations", "scorecards"}
 
 func tables(t *testing.T, pool *pgxpool.Pool) []string {
 	t.Helper()
@@ -68,6 +72,9 @@ func TestMigrationsUpDownUp(t *testing.T) {
 	m := migrator(t, url)
 	noErr(t, m.Up())
 	wantTables(t, pool, allTables)
+
+	noErr(t, m.Steps(-1)) // down 0003
+	wantTables(t, pool, withoutInbound)
 
 	noErr(t, m.Steps(-1)) // down 0002
 	wantTables(t, pool, coreTables)

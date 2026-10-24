@@ -15,7 +15,8 @@ groups=(vendorConnectivityConsumerGroup:node-performance-vendor-connectivity
   shippingAndTrackingConsumerGroup:node-performance-shipping-and-tracking
   deliveryPromiseConsumerGroup:node-performance-delivery-promise
   offerAvailabilityConsumerGroup:node-performance-offer-availability
-  nodeTopologyConsumerGroup:node-performance-node-topology)
+  nodeTopologyConsumerGroup:node-performance-node-topology
+  sellerInboundConsumerGroup:node-performance-seller-inbound)
 base=(--set database.url=postgres://u@example.invalid:5432/db
   --set kafka.brokers=kafka.example.invalid:9092)
 for g in "${groups[@]}"; do base+=(--set "config.${g%%:*}=${g#*:}"); done
@@ -57,7 +58,7 @@ done
 # The named list of the brief, spelled out so a rename in both places cannot pass silently.
 for var in DATABASE_URL MIGRATIONS_DATABASE_URL KAFKA_BROKERS VENDOR_CONNECTIVITY_CONSUMER_GROUP \
   SHIPPING_AND_TRACKING_CONSUMER_GROUP DELIVERY_PROMISE_CONSUMER_GROUP OFFER_AVAILABILITY_CONSUMER_GROUP \
-  NODE_TOPOLOGY_CONSUMER_GROUP HTTP_ADDR RECOMPUTE_INTERVAL OUTBOX_RELAY_INTERVAL OUTBOX_MAX_ATTEMPTS \
+  NODE_TOPOLOGY_CONSUMER_GROUP SELLER_INBOUND_CONSUMER_GROUP HTTP_ADDR RECOMPUTE_INTERVAL OUTBOX_RELAY_INTERVAL OUTBOX_MAX_ATTEMPTS \
   SHUTDOWN_DRAIN_DELAY LOG_LEVEL; do
   [[ " ${api_vars[*]} " == *" $var "* ]] || fail "$var is expected to be read by cmd/api but the scan did not find it"
 done
@@ -77,7 +78,8 @@ for g in "${groups[@]}"; do
     shippingAndTrackingConsumerGroup) var=SHIPPING_AND_TRACKING_CONSUMER_GROUP ;;
     deliveryPromiseConsumerGroup) var=DELIVERY_PROMISE_CONSUMER_GROUP ;;
     offerAvailabilityConsumerGroup) var=OFFER_AVAILABILITY_CONSUMER_GROUP ;;
-    *) var=NODE_TOPOLOGY_CONSUMER_GROUP ;;
+    nodeTopologyConsumerGroup) var=NODE_TOPOLOGY_CONSUMER_GROUP ;;
+    *) var=SELLER_INBOUND_CONSUMER_GROUP ;;
   esac
   [[ "$(env_value "$deployment" "$var")" == "${g#*:}" ]] || fail "$var is not rendered from config.${g%%:*}"
   grep -q "^  $var: \"${g#*:}\"" <<<"$configmap" || fail "the ConfigMap does not carry $var=${g#*:}"

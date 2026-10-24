@@ -3,7 +3,7 @@
 harness-template: v4
 
 Retail network, bounded context Node Performance (Supporting, partner tier). Owns the NodeScorecard (a 7-day and a 30-day one per node), grades every node from observed facts only, publishes NodeScorecardUpdated and NodeThresholdBreached, consumes thirteen event types from five producers and calls no sibling.
-Design source of truth: IQVO/retail-network-docs `model/model.yaml` (context node-performance). This service belongs to the retail network, not the warehouse-systems fleet.
+Design source of truth: IQVO/warehouse-docs `network/model/model.yaml` (context node-performance). This service belongs to the retail network, not the warehouse-systems fleet.
 This project is a domain-driven design study, not associated with any company: never name a real company, brand or product in code, comments, ADRs, specs, tests or fixtures (README `## Disclaimer`).
 
 ## Commands

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -110,6 +111,21 @@ func FreshURL(t testing.TB) string {
 		t.Fatalf("database url: %v", err)
 	}
 	return url
+}
+
+// Pool returns a connection pool on a FRESH migrated database, closed when
+// the test ends. It re-exports the outbound adapter's pool so an integration
+// test (cmd/mcp's, for one) can seed and inspect tables without importing
+// pgx — or the testcontainers postgres module the pgx rule ties to it —
+// itself.
+func Pool(t testing.TB) *pgxpool.Pool {
+	t.Helper()
+	pool, err := postgres.NewPool(context.Background(), FreshURL(t))
+	if err != nil {
+		t.Fatalf("open pool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
 }
 
 // Shutdown terminates the shared container; call it from TestMain.

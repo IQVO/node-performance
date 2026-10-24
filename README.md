@@ -14,10 +14,12 @@ It consumes what the network observed about every node and grades it from those 
 - shipping-and-tracking: packages handed over (against the order's `requiredShipBy`);
 - delivery-promise: promises kept and broken (only a node-attributable cause counts against the node);
 - offer-availability: inventory feeds applied (feed freshness);
-- node-topology: node events, consumed without effect.
+- node-topology: node events, consumed without effect;
+- vendor-connectivity `InboundReceiptSubmitted` and seller-inbound `InboundShipmentShipped`: joined by `shipmentId` into two informational inbound metrics.
 
 From the observations it keeps two `NodeScorecard`s per node, a 7-day and a 30-day one, and computes
-`onTimeHandoverRate`, `lateAckRate`, `rejectRate`, `expiryRate`, `promiseKeptRate` and `feedFreshnessP95Minutes`.
+`onTimeHandoverRate`, `lateAckRate`, `rejectRate`, `expiryRate`, `promiseKeptRate` and `feedFreshnessP95Minutes`; the scorecard read adds, when there is data, `inboundTimelinessP95Minutes`
+(p95 of receipt minus shipped time) and `inboundAccuracyRate` (cartons received over cartons reported). Those two are shown, never graded.
 Below 50 observations a scorecard is `PROVISIONAL` and carries no grade; from 50 it is graded `A` to `D`.
 
 It publishes `NodeScorecardUpdated` (integration topic `retailnetwork.node-performance.events`) and
@@ -38,20 +40,20 @@ warehouse-systems fleet; the fleet reaches the network only through the `vendor-
 
 Decisions are in [`docs/adr/`](docs/adr/index.md): the aggregate and its invariants with numbered assumptions (0002),
 consumed contracts and local facts (0003), the CloudEvents catalogue (0004), the outbox relay (0005), the HTTP adapter,
-consumers and readiness (0006). Configuration, probes and shutdown are in [`docs/runtime.md`](docs/runtime.md); the packaging
+consumers and readiness (0006), the informational inbound timeliness and accuracy metrics (0007). Configuration, probes and shutdown are in [`docs/runtime.md`](docs/runtime.md); the packaging
 checklist is [`docs/before-first-release.md`](docs/before-first-release.md).
 
 ## Runtime
 
 Go, hexagonal (`internal/domain`, `internal/application`, `internal/adapters`, `cmd/api`), real PostgreSQL and Kafka only
-(`DATABASE_URL`, `KAFKA_BROKERS` and five `*_CONSUMER_GROUP` variables are mandatory), CloudEvents 1.0 on every message
+(`DATABASE_URL`, `KAFKA_BROKERS` and six `*_CONSUMER_GROUP` variables are mandatory), CloudEvents 1.0 on every message
 (`com.retailnetwork.partner.node-performance.scorecard.<Event>`), transactional outbox with an attempt cap, chi REST adapter
 with problem+json, dependency-aware `/readyz`.
 
 ## Deployment
 
 Helm chart: [`charts/node-performance/`](charts/node-performance/) (one component, the `api`). It refuses to render without
-`database.url` or `database.existingSecret` (the DSN always reaches the pod through a Secret), `kafka.brokers`, the five
+`database.url` or `database.existingSecret` (the DSN always reaches the pod through a Secret), `kafka.brokers`, the six
 `config.*ConsumerGroup` ids (stable, service-prefixed, never the pod name) and a `terminationGracePeriodSeconds` of at least
 `config.shutdownDrainDelay` + 35 s (40 s by default). Defaults to the image `ghcr.io/iqvo/node-performance:v<appVersion>`.
 

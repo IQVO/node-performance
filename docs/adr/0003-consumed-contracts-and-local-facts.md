@@ -58,7 +58,7 @@ reading `GET /scorecards/{nodeId}`.
    environment variable, read at boot before the listener binds:
    `VENDOR_CONNECTIVITY_CONSUMER_GROUP`, `SHIPPING_AND_TRACKING_CONSUMER_GROUP`,
    `DELIVERY_PROMISE_CONSUMER_GROUP`, `OFFER_AVAILABILITY_CONSUMER_GROUP`,
-   `NODE_TOPOLOGY_CONSUMER_GROUP`. A message is committed only after its handler
+   `NODE_TOPOLOGY_CONSUMER_GROUP` (ADR 0007 adds a sixth, `SELLER_INBOUND_CONSUMER_GROUP`). A message is committed only after its handler
    returned nil; a transient failure is retried with capped backoff and dead-lettered
    to `<topic>.dlq` after the attempt cap; a payload that can never be applied is
    dead-lettered at once. A message that is not a CloudEvents 1.0 event, or whose type

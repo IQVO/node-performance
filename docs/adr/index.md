@@ -12,3 +12,4 @@ The *Status* column is copied from each ADR's own `## Status` section.
 | [0004](./0004-cloudevents-envelope-and-type-catalogue.md) | CloudEvents envelope and type catalogue | Accepted (2026-10-23) |
 | [0005](./0005-outbox-relay-and-attempt-cap.md) | the outbox relay, its attempt cap and the CloudEvents encoder | Accepted (2026-10-23) |
 | [0006](./0006-http-adapter-consumers-and-readiness.md) | the HTTP adapter, the consumers' failure policy, readiness and shutdown | Accepted (2026-10-23) |
+| [0007](./0007-inbound-timeliness-and-accuracy-metrics.md) | inbound timeliness and accuracy, two informational scorecard metrics | Accepted (2026-10-24) |

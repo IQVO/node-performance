@@ -17,7 +17,7 @@ func full() map[string]string {
 	return map[string]string{
 		"DATABASE_URL": "postgres://db/np", "KAFKA_BROKERS": " b1:9092 , ,b2:9092",
 		envVendorGroup: "np-vendor", envShippingGroup: "np-shipping", envPromiseGroup: "np-promise",
-		envOfferGroup: "np-offer", envTopologyGroup: "np-topology",
+		envOfferGroup: "np-offer", envTopologyGroup: "np-topology", envSellerGroup: "np-seller",
 	}
 }
 
@@ -60,7 +60,7 @@ func TestLoadConfigReadsTheOverrides(t *testing.T) {
 
 func TestEveryMandatoryVariableIsNamedInItsBootError(t *testing.T) {
 	logger, _ := quiet()
-	for _, name := range []string{"DATABASE_URL", envVendorGroup, envShippingGroup, envPromiseGroup, envOfferGroup, envTopologyGroup} {
+	for _, name := range []string{"DATABASE_URL", envVendorGroup, envShippingGroup, envPromiseGroup, envOfferGroup, envTopologyGroup, envSellerGroup} {
 		env := full()
 		delete(env, name)
 		_, err := loadConfig(envOf(env), logger)
@@ -122,7 +122,7 @@ func TestLogLevels(t *testing.T) {
 func assertGroups(t *testing.T, cfg config) {
 	t.Helper()
 	if g := cfg.groups; g.VendorConnectivity != "np-vendor" || g.ShippingAndTracking != "np-shipping" || g.DeliveryPromise != "np-promise" ||
-		g.OfferAvailability != "np-offer" || g.NodeTopology != "np-topology" {
+		g.OfferAvailability != "np-offer" || g.NodeTopology != "np-topology" || g.SellerInbound != "np-seller" {
 		t.Fatalf("groups = %+v", cfg.groups)
 	}
 }

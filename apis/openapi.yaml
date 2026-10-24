@@ -183,6 +183,22 @@ components:
           type: integer
           minimum: 0
           description: Observations counted in the window.
+        inboundTimelinessP95Minutes:
+          type: integer
+          minimum: 0
+          description: >-
+            Informational, never graded (ADR 0007). 95th percentile (nearest rank) of the whole minutes between a
+            shipment's InboundShipmentShipped.shippedAt and the receivedAt of its InboundReceiptSubmitted, over the
+            receipts received inside the window; a receipt stamped before its shipment counts as 0. Omitted when no
+            receipt joined to its shipment falls in the window. Lower is better.
+        inboundAccuracyRate:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Informational, never graded (ADR 0007). Cartons reported RECEIVED over all cartons reported by the receipts
+            received inside the window (joined to their shipment). Omitted when the window holds no such carton.
+            Higher is better.
     Scorecard:
       type: object
       required: [scorecardId, nodeId, window, state, grade, metrics]
@@ -235,6 +251,8 @@ components:
               promiseKeptRate: 0.92
               feedFreshnessP95Minutes: 55
               observations: 412
+              inboundTimelinessP95Minutes: 2880
+              inboundAccuracyRate: 0.97
             computedAt: '2026-10-22T14:03:00Z'
           - scorecardId: N-0042:30d
             nodeId: N-0042

@@ -23,6 +23,7 @@ const maxAttempts = 5
 type Deps struct {
 	Scorecards ports.ScorecardRepository
 	Facts      ports.PurchaseOrderFactsRepository
+	Inbound    ports.InboundRepository
 	Inbox      ports.ProcessedEvents
 	Outbox     ports.EventOutbox
 	UoW        ports.UnitOfWork

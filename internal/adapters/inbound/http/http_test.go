@@ -26,7 +26,7 @@ var now = time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)
 func seeded(t *testing.T) usecases.Queries {
 	t.Helper()
 	s := memory.NewStore()
-	d := usecases.Deps{Scorecards: s.Scorecards(), Facts: s.Facts(), Inbox: s.Inbox(), Outbox: s.Outbox(), UoW: s.UnitOfWork(), Clock: memory.NewClock(now)}
+	d := usecases.Deps{Scorecards: s.Scorecards(), Facts: s.Facts(), Inbound: s.Inbound(), Inbox: s.Inbox(), Outbox: s.Outbox(), UoW: s.UnitOfWork(), Clock: memory.NewClock(now)}
 	in := usecases.NewIntake(d)
 	ctx := context.Background()
 	ref := func(id string) usecases.EventRef { return usecases.EventRef{ID: id, Type: "x", Time: now} }

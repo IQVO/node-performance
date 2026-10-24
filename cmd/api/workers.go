@@ -33,7 +33,7 @@ func start(ctx context.Context, logger *slog.Logger, name string, loop func(cont
 	return w
 }
 
-// startConsumers starts the five consumers; the readers dial lazily inside Run,
+// startConsumers starts the six consumers; the readers dial lazily inside Run,
 // so a broker outage never blocks boot. The returned close releases readers and
 // dead-letter writers and must run after the workers stopped.
 func startConsumers(ctx context.Context, cfg config, intake usecases.Intake, logger *slog.Logger) ([]*worker, func()) {

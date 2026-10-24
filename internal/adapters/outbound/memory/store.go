@@ -34,6 +34,8 @@ type Store struct {
 	mu         sync.Mutex
 	scorecards map[string]scorecard.Snapshot
 	facts      map[string]scorecard.PurchaseOrderFacts
+	shipments  map[string]scorecard.InboundShipment
+	receipts   map[string]scorecard.InboundReceipt
 	processed  map[string]processedRow
 	outbox     []shared.Event
 }
@@ -43,6 +45,8 @@ func NewStore() *Store {
 	return &Store{
 		scorecards: map[string]scorecard.Snapshot{},
 		facts:      map[string]scorecard.PurchaseOrderFacts{},
+		shipments:  map[string]scorecard.InboundShipment{},
+		receipts:   map[string]scorecard.InboundReceipt{},
 		processed:  map[string]processedRow{},
 	}
 }
@@ -52,6 +56,8 @@ func NewStore() *Store {
 type state struct {
 	scorecards map[string]scorecard.Snapshot
 	facts      map[string]scorecard.PurchaseOrderFacts
+	shipments  map[string]scorecard.InboundShipment
+	receipts   map[string]scorecard.InboundReceipt
 	processed  map[string]processedRow
 	outbox     []shared.Event
 }
@@ -66,13 +72,14 @@ func cloneMap[K comparable, V any](m map[K]V) map[K]V {
 
 func (s *Store) capture() state {
 	return state{
-		scorecards: cloneMap(s.scorecards), facts: cloneMap(s.facts), processed: cloneMap(s.processed),
+		scorecards: cloneMap(s.scorecards), facts: cloneMap(s.facts), shipments: cloneMap(s.shipments), receipts: cloneMap(s.receipts), processed: cloneMap(s.processed),
 		outbox: append([]shared.Event(nil), s.outbox...),
 	}
 }
 
 func (s *Store) restore(st state) {
 	s.scorecards, s.facts, s.processed, s.outbox = st.scorecards, st.facts, st.processed, st.outbox
+	s.shipments, s.receipts = st.shipments, st.receipts
 }
 
 // txKey marks a ctx that carries the open unit of work of one store.
@@ -97,6 +104,9 @@ func (s *Store) Reader() *ScorecardReader { return &ScorecardReader{s} }
 // Facts returns the PurchaseOrderFactsRepository double.
 func (s *Store) Facts() *PurchaseOrderFacts { return &PurchaseOrderFacts{s} }
 
+// Inbound returns the InboundRepository and InboundReader double.
+func (s *Store) Inbound() *Inbound { return &Inbound{s} }
+
 // Inbox returns the ProcessedEvents double.
 func (s *Store) Inbox() *Inbox { return &Inbox{s} }
 
@@ -108,7 +118,7 @@ func (s *Store) UnitOfWork() *UnitOfWork { return &UnitOfWork{s} }
 
 // Counts is how many rows each table of the store holds.
 type Counts struct {
-	Scorecards, Facts, Processed, OutboxEvents int
+	Scorecards, Facts, Processed, OutboxEvents, Shipments, Receipts int
 	// VersionSum is the sum of every scorecard version: any saved change moves it.
 	VersionSum int64
 }
@@ -125,6 +135,6 @@ func (s *Store) Counts() Counts {
 	}
 	return Counts{
 		Scorecards: len(s.scorecards), Facts: len(s.facts), Processed: len(s.processed),
-		OutboxEvents: len(s.outbox), VersionSum: versions,
+		OutboxEvents: len(s.outbox), Shipments: len(s.shipments), Receipts: len(s.receipts), VersionSum: versions,
 	}
 }

@@ -32,7 +32,7 @@ type rig struct {
 
 func newRig() *rig {
 	s := memory.NewStore()
-	d := usecases.Deps{Scorecards: s.Scorecards(), Facts: s.Facts(), Inbox: s.Inbox(), Outbox: s.Outbox(), UoW: s.UnitOfWork(), Clock: memory.NewClock(t0)}
+	d := usecases.Deps{Scorecards: s.Scorecards(), Facts: s.Facts(), Inbound: s.Inbound(), Inbox: s.Inbox(), Outbox: s.Outbox(), UoW: s.UnitOfWork(), Clock: memory.NewClock(t0)}
 	return &rig{store: s, intake: usecases.NewIntake(d), logs: &bytes.Buffer{}}
 }
 

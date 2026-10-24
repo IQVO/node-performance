@@ -13,7 +13,7 @@ import (
 // newFixture wires every double over one store.
 func newFixture(s *memory.Store) repocontract.Fixture {
 	return repocontract.Fixture{
-		Scorecards: s.Scorecards(), Reader: s.Reader(), Facts: s.Facts(), Inbox: s.Inbox(),
+		Scorecards: s.Scorecards(), Reader: s.Reader(), Facts: s.Facts(), Inbound: s.Inbound(), InboundReader: s.Inbound(), Inbox: s.Inbox(),
 		Outbox: s.Outbox(), UoW: s.UnitOfWork(),
 		OutboxCount: func(context.Context) (int, error) { return len(s.Outbox().Events()), nil },
 	}

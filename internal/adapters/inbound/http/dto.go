@@ -16,6 +16,10 @@ type metricsDTO struct {
 	PromiseKeptRate         float64 `json:"promiseKeptRate"`
 	FeedFreshnessP95Minutes int     `json:"feedFreshnessP95Minutes"`
 	Observations            int     `json:"observations"`
+	// The inbound metrics are informational and omitted when the window has no
+	// data (ADR 0007).
+	InboundTimelinessP95Minutes *int     `json:"inboundTimelinessP95Minutes,omitempty"`
+	InboundAccuracyRate         *float64 `json:"inboundAccuracyRate,omitempty"`
 }
 
 type scorecardDTO struct {
@@ -46,6 +50,7 @@ func scorecardOf(v views.Scorecard) scorecardDTO {
 			OnTimeHandoverRate: v.Metrics.OnTimeHandoverRate, LateAckRate: v.Metrics.LateAckRate,
 			RejectRate: v.Metrics.RejectRate, ExpiryRate: v.Metrics.ExpiryRate, PromiseKeptRate: v.Metrics.PromiseKeptRate,
 			FeedFreshnessP95Minutes: v.Metrics.FeedFreshnessP95Minutes, Observations: v.Metrics.Observations,
+			InboundTimelinessP95Minutes: v.Metrics.InboundTimelinessP95Minutes, InboundAccuracyRate: v.Metrics.InboundAccuracyRate,
 		},
 	}
 	if !v.ComputedAt.IsZero() {

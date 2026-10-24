@@ -32,7 +32,7 @@ Contracts: [`apis/openapi.yaml`](apis/openapi.yaml), [`apis/asyncapi.yaml`](apis
 
 ## Status and design
 
-The design is proposed in [retail-network-docs](https://iqvo.github.io/retail-network-docs/contexts/node-performance);
+The design is proposed in [retail-network docs](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance);
 `model/model.yaml` there is the single source of truth. This repository is a service of the retail network, not of the
 warehouse-systems fleet; the fleet reaches the network only through the `vendor-connectivity` Vendor API.
 

@@ -64,25 +64,39 @@ func event(t testing.TB, id, typ string, data any) []byte {
 
 func at(minutes int) string { return t0.Add(time.Duration(minutes) * time.Minute).Format(time.RFC3339) }
 
-// fakeReader serves msgs in order, records commits, then fails with err.
+// fakeReader serves fetchErrs then msgs in order, records commits, then
+// fails with alwaysErr, or with end once alwaysErr is exhausted.
 type fakeReader struct {
 	mu        sync.Mutex
 	msgs      []kafkago.Message
 	committed []kafkago.Message
-	commitErr []error
+	commitErr []error // consumed one per CommitMessages call
+	fetchErrs []error // consumed one per FetchMessage call, BEFORE msgs
+	alwaysErr error   // returned once msgs and fetchErrs are exhausted
 	end       error
 	closed    bool
 }
 
 func (f *fakeReader) FetchMessage(ctx context.Context) (kafkago.Message, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
-	if len(f.msgs) == 0 {
-		return kafkago.Message{}, f.end
+	if len(f.fetchErrs) > 0 {
+		err := f.fetchErrs[0]
+		f.fetchErrs = f.fetchErrs[1:]
+		f.mu.Unlock()
+		return kafkago.Message{}, err
 	}
-	m := f.msgs[0]
-	f.msgs = f.msgs[1:]
-	return m, nil
+	if len(f.msgs) > 0 {
+		m := f.msgs[0]
+		f.msgs = f.msgs[1:]
+		f.mu.Unlock()
+		return m, nil
+	}
+	always, end := f.alwaysErr, f.end
+	f.mu.Unlock()
+	if always != nil {
+		return kafkago.Message{}, always
+	}
+	return kafkago.Message{}, end
 }
 
 func (f *fakeReader) CommitMessages(_ context.Context, msgs ...kafkago.Message) error {

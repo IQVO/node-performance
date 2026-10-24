@@ -94,7 +94,7 @@ type Clock interface {
 }
 
 // InboundRepository keeps the two local read models of the inbound metrics
-// (ADR 0007): the shipped instant of each shipment (from seller-inbound) and
+// (ADR 0009): the shipped instant of each shipment (from seller-inbound) and
 // the carton counts of each receipt (from vendor-connectivity). Both are
 // keyed by shipmentId and the first fact stored wins, so a redelivery or a
 // second report never moves a stored value and a receipt is counted once. A

@@ -8,9 +8,12 @@ alone selects ALL of them. Every Deployment here carries
 every Service selects on it, so each Service selects EXACTLY ONE Deployment.
 This test fails if that ever stops being true.
 
-This chart has one component, api (a single Deployment and its Service); HPA,
-Ingress and HTTPRoute are optional and off by default. The test renders it
-with those enabled and with the defaults.
+Components: api (always), mcp (cmd/mcp, the read-only MCP server of ADR
+0007) and frontend (the nginx pod serving the node_performance_mfe Module
+Federation build, ADR 0008) -- both optional and off by default, as are the
+HPA, Ingress and HTTPRoute. The frontend is never routed by this chart (the
+Nginx web gateway serves it). The test renders everything enabled and the
+defaults.
 
 Run: python3 charts/node-performance/tests/test_service_selectors.py
 Needs: helm, PyYAML.
@@ -56,7 +59,12 @@ ENABLE_EVERYTHING = BASE + [
     "--set", "gatewayApi.enabled=true",
     "--set", "gatewayApi.parentRefs[0].name=gw",
     "--set", "gatewayApi.parentRefs[0].namespace=infra",
+    "--set", "mcp.enabled=true",
+    "--set", "frontend.enabled=true",
 ]
+
+# Every env var cmd/mcp reads (cmd/mcp/main.go).
+MCP_ENV = ("MCP_ADDR", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL", "MIGRATIONS_DATABASE_URL")
 
 # Every env var cmd/api reads.
 API_ENV = (
@@ -104,14 +112,15 @@ def env_names(dep: dict) -> list[str]:
     return [e["name"] for e in dep["spec"]["template"]["spec"]["containers"][0].get("env", [])]
 
 
-def check_components(docs: list[dict], failures: list[str]) -> None:
+def check_components(docs: list[dict], failures: list[str], expect: list[str] | None = None) -> None:
     services = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "Service"}
     deployments = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "Deployment"}
+    want = sorted(expect) if expect is not None else [RELEASE]
 
-    if sorted(deployments) != [RELEASE]:
-        failures.append(f"only the api Deployment may render, got {sorted(deployments)}")
-    if sorted(services) != [RELEASE]:
-        failures.append(f"only the api Service may render, got {sorted(services)}")
+    if sorted(deployments) != want:
+        failures.append(f"expected Deployments {want}, got {sorted(deployments)}")
+    if sorted(services) != want:
+        failures.append(f"expected Services {want}, got {sorted(services)}")
     if RELEASE not in services:
         failures.append("the api Service was not rendered")
     elif selector_of(services[RELEASE]).get("app.kubernetes.io/component") != "api":
@@ -154,6 +163,42 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
         failures.append(f"no *_MODE variable may be rendered: {modes}")
 
 
+def check_mcp(deployments: dict, services: dict, failures: list[str]) -> None:
+    name = f"{RELEASE}-mcp"
+    if not pins(services.get(name), "mcp"):
+        failures.append("the MCP Service must exist and pin component=mcp")
+    if name not in deployments:
+        failures.append("the MCP Deployment was not rendered with mcp.enabled=true")
+        return
+    if command_of(deployments[name]) != ["/app/mcp"]:
+        failures.append("the MCP Deployment must run /app/mcp")
+    env = env_names(deployments[name])
+    for want in MCP_ENV:
+        if want not in env:
+            failures.append(f"the MCP Deployment does not render {want}")
+    for banned in ("KAFKA_BROKERS", "RECOMPUTE_INTERVAL", "OUTBOX_RELAY_INTERVAL"):
+        if banned in env:
+            failures.append(f"the MCP Deployment must not render {banned} (read-only, never dials Kafka)")
+
+
+def check_frontend(docs: list[dict], deployments: dict, services: dict, failures: list[str]) -> None:
+    name = f"{RELEASE}-frontend"
+    if not pins(services.get(name), "frontend"):
+        failures.append("the frontend Service must exist and pin component=frontend")
+    if services.get(name, {}).get("spec", {}).get("type") != "ClusterIP":
+        failures.append("the frontend Service must be ClusterIP")
+    if name not in deployments:
+        failures.append("the frontend Deployment was not rendered with frontend.enabled=true")
+        return
+    env = env_names(deployments[name])
+    for banned in ("DATABASE_URL", "KAFKA_BROKERS"):
+        if banned in env:
+            failures.append(f"the frontend Deployment must not render {banned} (it serves static bytes)")
+    for d in docs:
+        if d.get("kind") in {"Ingress", "HTTPRoute"} and "frontend" in d["metadata"]["name"]:
+            failures.append(f"{d['kind']} {d['metadata']['name']}: frontend routing must not live in this chart")
+
+
 def check_optional(docs: list[dict], failures: list[str]) -> None:
     kinds = {d.get("kind") for d in docs}
     for kind in ("HorizontalPodAutoscaler", "Ingress", "HTTPRoute"):
@@ -165,6 +210,16 @@ def check_optional(docs: list[dict], failures: list[str]) -> None:
         failures.append("the HPA does not scale the api Deployment")
     if "replicas" in deployments.get(RELEASE, {}).get("spec", {}):
         failures.append("the api Deployment must omit replicas when its HPA owns them")
+
+
+def command_of(dep: dict) -> list[str]:
+    return dep["spec"]["template"]["spec"]["containers"][0].get("command", [])
+
+
+def pins(svc: dict | None, component: str) -> bool:
+    if svc is None:
+        return False
+    return selector_of(svc).get("app.kubernetes.io/component") == component
 
 
 def check_refusals(failures: list[str]) -> None:
@@ -186,15 +241,25 @@ def check_refusals(failures: list[str]) -> None:
 def main() -> int:
     failures: list[str] = []
 
-    check_components(render(ENABLE_EVERYTHING), failures)
-    check_optional(render(ENABLE_EVERYTHING), failures)
+    everything = render(ENABLE_EVERYTHING)
+    expected = [RELEASE, f"{RELEASE}-mcp", f"{RELEASE}-frontend"]
+    check_components(everything, failures, expected)
+    check_optional(everything, failures)
+    deployments = {d["metadata"]["name"]: d for d in everything if d.get("kind") == "Deployment"}
+    services = {d["metadata"]["name"]: d for d in everything if d.get("kind") == "Service"}
+    check_mcp(deployments, services, failures)
+    check_frontend(everything, deployments, services, failures)
 
-    # Default values must not deploy an HPA, an Ingress or a route.
+    # Default values must not deploy an HPA, an Ingress, a route, the MCP
+    # server or the frontend.
     defaults = render(BASE)
     check_components(defaults, failures)
     stray = [d["kind"] for d in defaults if d.get("kind") in {"HorizontalPodAutoscaler", "Ingress", "HTTPRoute"}]
     if stray:
         failures.append(f"optional components rendered with default values: {stray}")
+    optional = [n for n in (d["metadata"]["name"] for d in defaults) if n.endswith(("-mcp", "-frontend"))]
+    if optional:
+        failures.append(f"mcp/frontend rendered with default values: {optional}")
 
     check_refusals(failures)
 
@@ -203,10 +268,11 @@ def main() -> int:
             print(f"FAIL: {f}")
         return 1
 
-    print("PASS: the api Service selects exactly one Deployment (the api); HPA, Ingress and HTTPRoute are off by default "
-          "and render when enabled; every env var cmd/api reads is rendered and no *_MODE is; the chart refuses to render "
-          "without a database source, brokers or any of the six consumer groups, with a *_MODE in extraEnv, or with a "
-          "grace period under 40s")
+    print("PASS: every Service selects exactly one Deployment (api, mcp, frontend); mcp and frontend are off by "
+          "default and render when enabled; every env var cmd/api and cmd/mcp read is rendered, no *_MODE is, the mcp "
+          "Deployment gets no Kafka env and the frontend none at all; the chart refuses to render without a database "
+          "source, brokers or any of the six consumer groups, with a *_MODE in extraEnv, or with a grace period "
+          "under 40s")
     return 0
 
 

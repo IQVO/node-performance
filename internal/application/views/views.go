@@ -18,7 +18,7 @@ type Metrics struct {
 	FeedFreshnessP95Minutes int
 	Observations            int
 	// InboundTimelinessP95Minutes and InboundAccuracyRate are informational
-	// (ADR 0007): nil when the window holds no joined inbound receipt (or no
+	// (ADR 0009): nil when the window holds no joined inbound receipt (or no
 	// carton for the accuracy).
 	InboundTimelinessP95Minutes *int
 	InboundAccuracyRate         *float64

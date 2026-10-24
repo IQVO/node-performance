@@ -40,7 +40,10 @@ WORKDIR /app
 # filesystem read-only. Logs go to stdout.
 COPY --from=build --chown=app:app /out/ ./
 USER 1000
-EXPOSE 8080
+# 8080 api (REST), 8090 mcp (Streamable HTTP; ADR 0007).
+EXPOSE 8080 8090
 # cmd/api is the service's main binary (HTTP on :8080). Additional cmd/*
-# binaries are run by the chart with `command: ["/app/<dirname>"]`.
+# binaries are run by the chart with `command: ["/app/<dirname>"]`; cmd/mcp is
+# the read-only MCP server on :8090. The web remote has its own image
+# (web/Dockerfile).
 ENTRYPOINT ["./api"]

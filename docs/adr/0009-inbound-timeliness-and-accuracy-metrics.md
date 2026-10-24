@@ -1,4 +1,4 @@
-# ADR 0007: inbound timeliness and accuracy, two informational scorecard metrics
+# ADR 0009: inbound timeliness and accuracy, two informational scorecard metrics
 
 ## Status
 

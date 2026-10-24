@@ -121,7 +121,7 @@ chart_name="$(awk '/^name:/ {print $2}' "$chart_dir/Chart.yaml")"
 # --- components: only the api; optional extras are off by default --------------------------
 if grep -qE 'kind: (HorizontalPodAutoscaler|Ingress|HTTPRoute)' <<<"$all"; then fail "HPA, Ingress and HTTPRoute must be off by default"; fi
 [[ "$(grep -c '^kind: Deployment' <<<"$all")" == 1 ]] || fail "exactly one Deployment (the api) must render"
-if grep -qiE 'projector|reports|frontend|mcp' <<<"$all"; then fail "no MCP, frontend, projector or reports component belongs in this chart"; fi
+if grep -qiE 'projector|reports|frontend|mcp' <<<"$all"; then fail "mcp and frontend must be off by default; no projector or reports component belongs in this chart"; fi
 if grep -qiE 'value: "?(permissive|log|off)"?$|in-memory|permissive' <<<"$all"$'\n'"$(cat "$chart_dir/templates/NOTES.txt")"; then
   fail "the render or NOTES.txt carries a permissive/log/off or in-memory mode"
 fi
@@ -164,5 +164,68 @@ tpl "${base[@]}" --set terminationGracePeriodSeconds=40 >/dev/null || fail "a 40
 tpl "${base[@]}" --set config.shutdownDrainDelay=30s --set terminationGracePeriodSeconds=65 >/dev/null || fail "a 30s drain with a 65s grace period must render"
 expect_refusal "an unparsable drain delay" "config.shutdownDrainDelay" "${base[@]}" --set config.shutdownDrainDelay=soon
 expect_refusal "a listen port that is not the container port" "config.httpAddr" "${base[@]}" --set config.httpAddr=:9090
+
+
+# --- optional components (ADR 0007 mcp, ADR 0008 console remote) ----------------------
+# render_one <template> <extra helm args...>: one template, the mandatory base set.
+render_one() { helm template "$release" "$chart_dir" --show-only "templates/$1" "${@:2}"; }
+# binary_env_of <main.go>: the upper-case env literals a cmd reads.
+binary_env_of() { grep -ohE '"[A-Z][A-Z0-9_]*"' "$1" | tr -d '"' | sort -u; }
+assert_env() { # assert_env <rendered> <what> <VAR>...
+  local rendered="$1" what="$2"; shift 2
+  for var in "$@"; do grep -q "name: $var$" <<<"$rendered" || fail "$what does not render $var"; done
+}
+
+# mcp: its own env, never the api ConfigMap, never Kafka (ADR 0007).
+mcp_dep="$(render_one mcp-deployment.yaml "${base[@]}" --set mcp.enabled=true)"
+grep -q 'app.kubernetes.io/component: mcp' <<<"$mcp_dep" || fail "the mcp Deployment was not rendered with mcp.enabled=true"
+grep -q 'command: \["/app/mcp"\]' <<<"$mcp_dep" || fail "the mcp Deployment must run /app/mcp"
+if grep -q 'configMapRef:' <<<"$mcp_dep"; then fail "mcp-deployment.yaml must not mount the api ConfigMap"; fi
+if grep -Eq 'name: (KAFKA_BROKERS|OUTBOX_[A-Z_]+|RECOMPUTE_[A-Z_]+|[A-Z]+_CONSUMER_GROUP)$' <<<"$mcp_dep"; then
+  fail "the mcp Deployment must not get Kafka/relay/scheduler/consumer env (read-only, never dials Kafka)"
+fi
+if grep -qE 'name: [A-Z_]*_MODE$' <<<"$mcp_dep"; then fail "no *_MODE variable may be rendered on the mcp Deployment"; fi
+# shellcheck disable=SC2207
+mcp_vars=($(binary_env_of "$repo_dir/cmd/mcp/main.go"))
+(( ${#mcp_vars[@]} >= 5 )) || fail "found only ${#mcp_vars[@]} env literals in cmd/mcp/main.go; the scan is looking in the wrong place"
+assert_env "$mcp_dep" "the mcp Deployment" "${mcp_vars[@]}"
+grep -A4 'name: DATABASE_URL$' <<<"$mcp_dep" | grep -q 'secretKeyRef:' || fail "the mcp Deployment's DATABASE_URL must come from a Secret"
+grep -A6 'name: MIGRATIONS_DATABASE_URL$' <<<"$mcp_dep" | grep -q 'optional: true' || fail "the mcp Deployment's MIGRATIONS_DATABASE_URL must be an optional secretKeyRef"
+dups="$(grep -E '^ {12}- name: ' <<<"$mcp_dep" | sort | uniq -d)"
+[[ -z "$dups" ]] || fail "the mcp Deployment renders an env var twice: $dups"
+
+mcp_svc="$(render_one mcp-service.yaml "${base[@]}" --set mcp.enabled=true)"
+grep -q 'app.kubernetes.io/component: mcp' <<<"$mcp_svc" || fail "the mcp Service does not pin component=mcp"
+grep -q 'type: ClusterIP' <<<"$mcp_svc" || fail "the mcp Service must stay ClusterIP"
+
+# The host route rewrites /api/mcp/node-performance to the SDK's /mcp endpoint.
+mcp_route="$(render_one mcp-route.yaml "${base[@]}" --set mcp.enabled=true --set mcp.route.enabled=true \
+  --set mcp.route.parentRefs[0].name=gw --set mcp.route.parentRefs[0].namespace=kong)"
+grep -q 'kind: HTTPRoute' <<<"$mcp_route" || fail "the mcp HTTPRoute was not rendered with mcp.route.enabled=true"
+grep -q 'value: /api/mcp/node-performance' <<<"$mcp_route" || fail "the mcp route must carry the fleet host path"
+grep -q 'replacePrefixMatch: /mcp' <<<"$mcp_route" || fail "the mcp route must rewrite the prefix to /mcp"
+grep -q "name: ${release}-mcp" <<<"$mcp_route" || fail "the mcp route must target the mcp Service"
+
+# frontend: the web remote (ADR 0008). Static bytes; no database, no Kafka.
+frontend_dep="$(render_one frontend-deployment.yaml "${base[@]}" --set frontend.enabled=true)"
+frontend_svc="$(render_one frontend-service.yaml "${base[@]}" --set frontend.enabled=true)"
+grep -q 'app.kubernetes.io/component: frontend' <<<"$frontend_dep" || fail "the frontend Deployment was not rendered with frontend.enabled=true"
+grep -q 'type: ClusterIP' <<<"$frontend_svc" || fail "the frontend Service must stay ClusterIP"
+if grep -Eq 'name: (DATABASE_URL|MIGRATIONS_DATABASE_URL|KAFKA_BROKERS)$' <<<"$frontend_dep"; then fail "the frontend Deployment must not get database/Kafka env"; fi
+if grep -q 'command:' <<<"$frontend_dep"; then fail "the frontend container runs the image's own nginx entrypoint"; fi
+
+# All three components at once: every Service still selects exactly one
+# Deployment (tests/test_service_selectors.py proves it structurally).
+together="$(tpl "${base[@]}" --set mcp.enabled=true --set frontend.enabled=true)"
+[[ "$(grep -c '^kind: Deployment$' <<<"$together")" == 3 ]] || fail "api + mcp + frontend must render three Deployments"
+[[ "$(grep -c '^kind: Service$' <<<"$together")" == 3 ]] || fail "api + mcp + frontend must render three Services"
+if grep -E 'kind: (Ingress|HTTPRoute)' <<<"$together" | grep -q frontend; then
+  fail "frontend routing must not live in this chart"
+fi
+# ...and the ci values file used by ct lint renders the same set.
+ci_all="$(helm template "$release" "$chart_dir" -f "$chart_dir/ci/all-components-values.yaml")"
+for needle in 'component: mcp' 'component: frontend' 'command: ["/app/mcp"]'; do
+  grep -qF "$needle" <<<"$ci_all" || fail "ci/all-components-values.yaml must render $needle"
+done
 
 echo "PASS: node-performance chart render assertions"

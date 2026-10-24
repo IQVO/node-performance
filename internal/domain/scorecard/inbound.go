@@ -8,7 +8,7 @@ import (
 )
 
 // CartonStatusReceived is the receipt carton status that counts as accurate
-// (ADR 0007). Any other status, known or not, is a carton that did not arrive
+// (ADR 0009). Any other status, known or not, is a carton that did not arrive
 // as expected.
 const CartonStatusReceived = "RECEIVED"
 
@@ -77,7 +77,7 @@ type InboundObservation struct {
 // JoinInbound joins a receipt to the shipped instant of its shipment. The
 // duration is receivedAt - shippedAt truncated to whole minutes; a receipt
 // stamped before its shipment (clock skew between two producers) is CLAMPED to
-// zero minutes, not rejected: the carton counts are still real facts (ADR 0007).
+// zero minutes, not rejected: the carton counts are still real facts (ADR 0009).
 func JoinInbound(r InboundReceipt, shippedAt time.Time) InboundObservation {
 	minutes := int(max(r.ReceivedAt.Sub(shippedAt), 0) / time.Minute)
 	return InboundObservation{ReceivedAt: r.ReceivedAt, Minutes: minutes, CartonsTotal: r.CartonsTotal, CartonsReceived: r.CartonsReceived}

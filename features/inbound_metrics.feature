@@ -1,5 +1,5 @@
 Feature: Inbound timeliness and accuracy
-  Two informational metrics per node window (ADR 0007): the p95 of the minutes
+  Two informational metrics per node window (ADR 0009): the p95 of the minutes
   between a shipment's shipped instant and its receipt, and the share of
   reported cartons that arrived RECEIVED. A receipt is joined to its shipment
   by shipmentId, whichever of the two events arrives first, and counts once.

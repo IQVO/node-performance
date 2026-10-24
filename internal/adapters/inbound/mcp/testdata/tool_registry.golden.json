@@ -1,0 +1,231 @@
+[
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read both scorecards of a node: the 7-day and the 30-day window, in that order, each with its state (PROVISIONAL or GRADED), its grade (A, B, C, D, or PROVISIONAL below the observation minimum of 50), its metrics (onTimeHandoverRate, lateAckRate, rejectRate, expiryRate, promiseKeptRate, feedFreshnessP95Minutes, observations) and computedAt, omitted before the first recompute. Read-only; an unknown node fails with not-found and a malformed node id with validation-failed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "nodeId": {
+          "description": "the node whose scorecards to read, e.g. N-0042; both the 7-day and the 30-day window are returned",
+          "type": "string"
+        }
+      },
+      "required": [
+        "nodeId"
+      ],
+      "type": "object"
+    },
+    "name": "get_scorecard",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "nodeId": {
+          "type": "string"
+        },
+        "scorecards": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "computedAt": {
+                "type": "string"
+              },
+              "grade": {
+                "type": "string"
+              },
+              "metrics": {
+                "additionalProperties": false,
+                "properties": {
+                  "expiryRate": {
+                    "type": "number"
+                  },
+                  "feedFreshnessP95Minutes": {
+                    "type": "integer"
+                  },
+                  "lateAckRate": {
+                    "type": "number"
+                  },
+                  "observations": {
+                    "type": "integer"
+                  },
+                  "onTimeHandoverRate": {
+                    "type": "number"
+                  },
+                  "promiseKeptRate": {
+                    "type": "number"
+                  },
+                  "rejectRate": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "onTimeHandoverRate",
+                  "lateAckRate",
+                  "rejectRate",
+                  "expiryRate",
+                  "promiseKeptRate",
+                  "feedFreshnessP95Minutes",
+                  "observations"
+                ],
+                "type": "object"
+              },
+              "nodeId": {
+                "type": "string"
+              },
+              "scorecardId": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "window": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "scorecardId",
+              "nodeId",
+              "window",
+              "state",
+              "grade",
+              "metrics"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "nodeId",
+        "scorecards"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "List the scorecards whose current grade matches, ordered by scorecardId ascending, one page at a time: grade is required (A, B, C, D or PROVISIONAL), the window filter (7d or 30d), the page size (1..500, default 100) and the cursor are optional. Pass the returned nextCursor as after to get the next page; it is absent on the last page. Read-only; a bad grade, window or limit fails with validation-failed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "description": "the optional cursor returned as nextCursor by the previous page; omitted means the first page",
+          "type": "string"
+        },
+        "grade": {
+          "description": "the current grade to list: A, B, C, D or PROVISIONAL (required)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "optional page size, 1..500; omitted or 0 means the default page size of 100",
+          "type": "integer"
+        },
+        "window": {
+          "description": "optional window filter, 7d or 30d; omitted means both windows",
+          "type": "string"
+        }
+      },
+      "required": [
+        "grade"
+      ],
+      "type": "object"
+    },
+    "name": "list_scorecards_by_grade",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "computedAt": {
+                "type": "string"
+              },
+              "grade": {
+                "type": "string"
+              },
+              "metrics": {
+                "additionalProperties": false,
+                "properties": {
+                  "expiryRate": {
+                    "type": "number"
+                  },
+                  "feedFreshnessP95Minutes": {
+                    "type": "integer"
+                  },
+                  "lateAckRate": {
+                    "type": "number"
+                  },
+                  "observations": {
+                    "type": "integer"
+                  },
+                  "onTimeHandoverRate": {
+                    "type": "number"
+                  },
+                  "promiseKeptRate": {
+                    "type": "number"
+                  },
+                  "rejectRate": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "onTimeHandoverRate",
+                  "lateAckRate",
+                  "rejectRate",
+                  "expiryRate",
+                  "promiseKeptRate",
+                  "feedFreshnessP95Minutes",
+                  "observations"
+                ],
+                "type": "object"
+              },
+              "nodeId": {
+                "type": "string"
+              },
+              "scorecardId": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "window": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "scorecardId",
+              "nodeId",
+              "window",
+              "state",
+              "grade",
+              "metrics"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    }
+  }
+]

@@ -24,7 +24,7 @@ const (
 type Queries struct {
 	Reader ports.ScorecardReader
 	// Inbound and Clock add the informational inbound metrics to the metrics
-	// of each scorecard (ADR 0007). A nil Inbound leaves them out.
+	// of each scorecard (ADR 0009). A nil Inbound leaves them out.
 	Inbound ports.InboundReader
 	Clock   ports.Clock
 }

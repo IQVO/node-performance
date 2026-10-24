@@ -17,7 +17,7 @@ type metricsDTO struct {
 	FeedFreshnessP95Minutes int     `json:"feedFreshnessP95Minutes"`
 	Observations            int     `json:"observations"`
 	// The inbound metrics are informational and omitted when the window has no
-	// data (ADR 0007).
+	// data (ADR 0009).
 	InboundTimelinessP95Minutes *int     `json:"inboundTimelinessP95Minutes,omitempty"`
 	InboundAccuracyRate         *float64 `json:"inboundAccuracyRate,omitempty"`
 }

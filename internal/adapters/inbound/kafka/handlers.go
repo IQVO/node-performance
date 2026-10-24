@@ -223,7 +223,7 @@ func NodeTopologyHandlers(intake usecases.Intake, logger *slog.Logger) map[strin
 }
 
 // SellerInboundHandlers returns the seller-inbound handlers: only the shipped
-// instant is relied on (ADR 0007).
+// instant is relied on (ADR 0009).
 func SellerInboundHandlers(intake usecases.Intake, logger *slog.Logger) map[string]HandlerFunc {
 	return map[string]HandlerFunc{
 		TypeInboundShipmentShipped: handle(logger, func(ctx context.Context, e ce.Event, d inboundShippedData) (usecases.Outcome, error) {

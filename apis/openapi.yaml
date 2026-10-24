@@ -187,7 +187,7 @@ components:
           type: integer
           minimum: 0
           description: >-
-            Informational, never graded (ADR 0007). 95th percentile (nearest rank) of the whole minutes between a
+            Informational, never graded (ADR 0009). 95th percentile (nearest rank) of the whole minutes between a
             shipment's InboundShipmentShipped.shippedAt and the receivedAt of its InboundReceiptSubmitted, over the
             receipts received inside the window; a receipt stamped before its shipment counts as 0. Omitted when no
             receipt joined to its shipment falls in the window. Lower is better.
@@ -196,7 +196,7 @@ components:
           minimum: 0
           maximum: 1
           description: >-
-            Informational, never graded (ADR 0007). Cartons reported RECEIVED over all cartons reported by the receipts
+            Informational, never graded (ADR 0009). Cartons reported RECEIVED over all cartons reported by the receipts
             received inside the window (joined to their shipment). Omitted when the window holds no such carton.
             Higher is better.
     Scorecard:

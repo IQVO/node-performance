@@ -117,7 +117,7 @@ channels:
     description: |
       The integration topic of seller-inbound, consumed by the node-performance
       consumer group read from SELLER_INBOUND_CONSUMER_GROUP. Only
-      InboundShipmentShipped is relied on (ADR 0007). Tolerant decoding:
+      InboundShipmentShipped is relied on (ADR 0009). Tolerant decoding:
       unknown types and unknown fields are ignored; every message is
       deduplicated on the CloudEvents `id` in the inbox.
     messages:
@@ -544,7 +544,7 @@ components:
       name: InboundReceiptSubmitted
       title: Inbound receipt submitted
       summary: A vendor reported what its dock received against an inbound shipment.
-      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.inboundreceipt.InboundReceiptSubmitted`, from vendor-connectivity. Fields relied on: shipmentId, nodeId, receivedAt and the status of each carton. The receipt is kept as carton counts (RECEIVED over all reported) and joined by shipmentId to the shipped instant from InboundShipmentShipped; one receipt per shipment counts, the first. It raises no scorecard observation and never feeds the grade (ADR 0007). Every other field is ignored."
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.inboundreceipt.InboundReceiptSubmitted`, from vendor-connectivity. Fields relied on: shipmentId, nodeId, receivedAt and the status of each carton. The receipt is kept as carton counts (RECEIVED over all reported) and joined by shipmentId to the shipped instant from InboundShipmentShipped; one receipt per shipment counts, the first. It raises no scorecard observation and never feeds the grade (ADR 0009). Every other field is ignored."
       contentType: application/cloudevents+json
       tags:
         - name: consumed
@@ -583,7 +583,7 @@ components:
       name: InboundShipmentShipped
       title: Inbound shipment shipped
       summary: A seller shipped an inbound shipment towards a node.
-      description: "`type` = `com.retailnetwork.partner.seller-inbound.inboundshipment.InboundShipmentShipped`, from seller-inbound (topic `retailnetwork.seller-inbound.events`). Fields relied on: shipmentId, nodeId, shippedAt. The shipped instant is kept per shipment (the first one wins) so a receipt can be joined to it, whichever of the two events arrives first. It raises no scorecard observation (ADR 0007). Every other field (planId, sellerId, ...) is ignored."
+      description: "`type` = `com.retailnetwork.partner.seller-inbound.inboundshipment.InboundShipmentShipped`, from seller-inbound (topic `retailnetwork.seller-inbound.events`). Fields relied on: shipmentId, nodeId, shippedAt. The shipped instant is kept per shipment (the first one wins) so a receipt can be joined to it, whichever of the two events arrives first. It raises no scorecard observation (ADR 0009). Every other field (planId, sellerId, ...) is ignored."
       contentType: application/cloudevents+json
       tags:
         - name: consumed

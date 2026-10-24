@@ -1,4 +1,4 @@
--- Local read models of the inbound metrics (ADR 0007).
+-- Local read models of the inbound metrics (ADR 0009).
 --
 -- inbound_shipments: the shipped instant of each shipment, from seller-inbound's
 -- InboundShipmentShipped. The first fact stored wins (ON CONFLICT DO NOTHING).

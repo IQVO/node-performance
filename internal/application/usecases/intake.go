@@ -331,7 +331,7 @@ type InboundReceiptSubmitted struct {
 }
 
 // InboundShipmentShipped keeps the shipped instant of a shipment. It records no
-// scorecard observation: the receipt joined to it does (ADR 0007). A shipment
+// scorecard observation: the receipt joined to it does (ADR 0009). A shipment
 // stored already (the first instant wins) is a duplicate.
 func (i Intake) InboundShipmentShipped(ctx context.Context, in InboundShipmentShipped) (Outcome, error) {
 	return i.apply(ctx, in.Ref, func(ctx context.Context) (Outcome, error) {

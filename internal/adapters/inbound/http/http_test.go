@@ -36,10 +36,12 @@ func seeded(t *testing.T) usecases.Queries {
 		must(t, firstErr(in.PackageHandedOver(ctx, usecases.PackageHandedOver{Ref: ref("h" + po), PoNumber: po, NodeID: "node-a", HandedOverAt: now})))
 	}
 	must(t, firstErr(in.InventoryFeedApplied(ctx, usecases.InventoryFeedApplied{Ref: ref("f1"), NodeID: "node-b", AppliedAt: now})))
+	must(t, firstErr(in.InboundShipmentShipped(ctx, usecases.InboundShipmentShipped{Ref: ref("is"), ShipmentID: "shp-1", NodeID: "node-a", ShippedAt: now.Add(-3 * time.Hour)})))
+	must(t, firstErr(in.InboundReceiptSubmitted(ctx, usecases.InboundReceiptSubmitted{Ref: ref("ir"), ShipmentID: "shp-1", NodeID: "node-a", ReceivedAt: now.Add(-time.Hour), CartonStatuses: []string{"RECEIVED", "MISSING"}})))
 	if _, err := usecases.NewRecompute(d).Run(ctx); err != nil {
 		t.Fatal(err)
 	}
-	return usecases.Queries{Reader: s.Reader()}
+	return usecases.Queries{Reader: s.Reader(), Inbound: s.Inbound(), Clock: memory.NewClock(now)}
 }
 
 func firstErr(_ usecases.Outcome, err error) error { return err }
@@ -128,7 +130,7 @@ func TestGetScorecardReturnsBothWindowsInTheContractShape(t *testing.T) {
 		}
 	}
 	m := first["metrics"].(map[string]any)
-	if len(m) != 7 || first["grade"] != "A" || first["state"] != "GRADED" || m["observations"].(float64) != 50 || m["onTimeHandoverRate"].(float64) != 1 {
+	if len(m) != 9 || first["grade"] != "A" || first["state"] != "GRADED" || m["observations"].(float64) != 50 || m["onTimeHandoverRate"].(float64) != 1 {
 		t.Fatalf("scorecard = %v", first)
 	}
 }
@@ -342,5 +344,41 @@ func TestReadinessCachesItsVerdictWithinTheTTL(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("the default ttl caches the verdict: %d checks", calls)
+	}
+}
+
+func TestInboundMetricsAreOptionalAndAdditiveOnTheScorecardRead(t *testing.T) {
+	h := router(t, realServer(t))
+	metrics := func(target string) map[string]any {
+		r := get(h, target)
+		if r.status != 200 {
+			t.Fatalf("%s: %d %s", target, r.status, r.raw)
+		}
+		body := r.json(t)
+		list, ok := body["scorecards"].([]any)
+		if !ok {
+			list = body["items"].([]any)
+		}
+		return list[0].(map[string]any)["metrics"].(map[string]any)
+	}
+	withData := metrics("/scorecards/node-a")
+	if withData["inboundTimelinessP95Minutes"] != float64(120) || withData["inboundAccuracyRate"] != 0.5 {
+		t.Fatalf("node-a metrics = %v", withData)
+	}
+	for _, key := range []string{"onTimeHandoverRate", "lateAckRate", "rejectRate", "expiryRate", "promiseKeptRate", "feedFreshnessP95Minutes", "observations"} {
+		if _, ok := withData[key]; !ok {
+			t.Errorf("the existing metric %s must stay", key)
+		}
+	}
+	without := metrics("/scorecards/node-b")
+	if _, ok := without["inboundTimelinessP95Minutes"]; ok {
+		t.Errorf("no data must omit the timeliness: %v", without)
+	}
+	if _, ok := without["inboundAccuracyRate"]; ok {
+		t.Errorf("no data must omit the accuracy: %v", without)
+	}
+	listed := metrics("/scorecards?grade=A&window=30d")
+	if listed["inboundAccuracyRate"] != 0.5 {
+		t.Errorf("the list carries the metrics too: %v", listed)
 	}
 }

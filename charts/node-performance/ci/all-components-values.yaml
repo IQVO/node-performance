@@ -11,6 +11,7 @@ config:
   deliveryPromiseConsumerGroup: "node-performance-delivery-promise"
   offerAvailabilityConsumerGroup: "node-performance-offer-availability"
   nodeTopologyConsumerGroup: "node-performance-node-topology"
+  sellerInboundConsumerGroup: "node-performance-seller-inbound"
 mcp:
   enabled: true
   route:

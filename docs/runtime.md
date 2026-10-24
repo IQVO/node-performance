@@ -16,7 +16,7 @@ consumers, a recompute scheduler and the outbox relay.
 | `DELIVERY_PROMISE_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.delivery-promise.events`. |
 | `OFFER_AVAILABILITY_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.offer-availability.events`. |
 | `NODE_TOPOLOGY_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.node-topology.events`. |
-| `SELLER_INBOUND_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.seller-inbound.events` (the shipped instant of each inbound shipment, ADR 0007). |
+| `SELLER_INBOUND_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.seller-inbound.events` (the shipped instant of each inbound shipment, ADR 0009). |
 | `HTTP_ADDR` | `:8080` | Listen address. |
 | `RECOMPUTE_INTERVAL` | `1m` | How often the scheduler recomputes the due scorecards (Go duration or seconds). |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Poll interval of the relay (Go duration or seconds). |

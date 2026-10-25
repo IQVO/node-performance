@@ -17,6 +17,11 @@ type Metrics struct {
 	PromiseKeptRate         float64
 	FeedFreshnessP95Minutes int
 	Observations            int
+	// InboundTimelinessP95Minutes and InboundAccuracyRate are informational
+	// (ADR 0009): nil when the window holds no joined inbound receipt (or no
+	// carton for the accuracy).
+	InboundTimelinessP95Minutes *int
+	InboundAccuracyRate         *float64
 }
 
 // Scorecard is the read form of a NodeScorecard.

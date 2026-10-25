@@ -30,6 +30,7 @@ const (
 	envPromiseGroup  = "DELIVERY_PROMISE_CONSUMER_GROUP"
 	envOfferGroup    = "OFFER_AVAILABILITY_CONSUMER_GROUP"
 	envTopologyGroup = "NODE_TOPOLOGY_CONSUMER_GROUP"
+	envSellerGroup   = "SELLER_INBOUND_CONSUMER_GROUP"
 )
 
 // Defaults of the optional settings.
@@ -91,7 +92,7 @@ func loadConfig(getenv func(string) string, logger *slog.Logger) (config, error)
 	}, nil
 }
 
-// loadGroups reads the five consumer group ids, each mandatory.
+// loadGroups reads the six consumer group ids, each mandatory.
 func loadGroups(getenv func(string) string) (inboundkafka.Groups, error) {
 	var g inboundkafka.Groups
 	for _, f := range []struct {
@@ -100,7 +101,7 @@ func loadGroups(getenv func(string) string) (inboundkafka.Groups, error) {
 	}{
 		{envVendorGroup, &g.VendorConnectivity}, {envShippingGroup, &g.ShippingAndTracking},
 		{envPromiseGroup, &g.DeliveryPromise}, {envOfferGroup, &g.OfferAvailability},
-		{envTopologyGroup, &g.NodeTopology},
+		{envTopologyGroup, &g.NodeTopology}, {envSellerGroup, &g.SellerInbound},
 	} {
 		v, err := postgres.RequireEnv(getenv, f.env)
 		if err != nil {

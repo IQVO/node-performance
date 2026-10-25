@@ -67,10 +67,10 @@ spec:
               value: {{ .Values.config.outboxMaxAttempts | quote }}
             - name: SHUTDOWN_DRAIN_DELAY
               value: {{ .Values.config.shutdownDrainDelay | quote }}
-            # Mandatory: the relay, the five consumers and /readyz dial Kafka.
+            # Mandatory: the relay, the six consumers and /readyz dial Kafka.
             - name: KAFKA_BROKERS
               value: {{ .Values.kafka.brokers | quote }}
-            # The five STABLE consumer group ids come from values, never a
+            # The six STABLE consumer group ids come from values, never a
             # literal and never the pod name; the chart refuses an empty one.
             - name: VENDOR_CONNECTIVITY_CONSUMER_GROUP
               value: {{ .Values.config.vendorConnectivityConsumerGroup | quote }}
@@ -82,6 +82,8 @@ spec:
               value: {{ .Values.config.offerAvailabilityConsumerGroup | quote }}
             - name: NODE_TOPOLOGY_CONSUMER_GROUP
               value: {{ .Values.config.nodeTopologyConsumerGroup | quote }}
+            - name: SELLER_INBOUND_CONSUMER_GROUP
+              value: {{ .Values.config.sellerInboundConsumerGroup | quote }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

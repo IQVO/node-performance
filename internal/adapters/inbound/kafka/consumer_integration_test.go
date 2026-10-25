@@ -28,7 +28,7 @@ func TestConsumerAppliesKafkaEventsToPostgresOnceAndDeadLettersPoison(t *testing
 	}
 	t.Cleanup(pool.Close)
 	deps := usecases.Deps{
-		Scorecards: postgres.NewScorecardRepo(pool), Facts: postgres.NewPurchaseOrderFactsRepo(pool),
+		Scorecards: postgres.NewScorecardRepo(pool), Facts: postgres.NewPurchaseOrderFactsRepo(pool), Inbound: postgres.NewInboundRepo(pool),
 		Inbox: postgres.NewInboxRepo(pool), Outbox: postgres.NewOutboxRepo(pool, outkafka.NewEncoder()),
 		UoW: postgres.NewUnitOfWork(pool), Clock: clock.System{},
 	}

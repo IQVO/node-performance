@@ -114,7 +114,7 @@ func buildAdapters(ctx context.Context, cfg config, logger *slog.Logger) (adapte
 
 func postgresAdapters(pool *pgxpool.Pool) adapters {
 	return adapters{pool: pool, relayStore: postgres.NewRelayStore(pool), deps: usecases.Deps{
-		Scorecards: postgres.NewScorecardRepo(pool), Facts: postgres.NewPurchaseOrderFactsRepo(pool),
+		Scorecards: postgres.NewScorecardRepo(pool), Facts: postgres.NewPurchaseOrderFactsRepo(pool), Inbound: postgres.NewInboundRepo(pool),
 		Inbox: postgres.NewInboxRepo(pool), Outbox: postgres.NewOutboxRepo(pool, outboundkafka.NewEncoder()),
 		UoW: postgres.NewUnitOfWork(pool), Clock: clock.System{},
 	}}
@@ -122,7 +122,7 @@ func postgresAdapters(pool *pgxpool.Pool) adapters {
 
 // buildServer wires the query use cases into the REST server.
 func buildServer(ad adapters, readiness *inboundhttp.Readiness, logger *slog.Logger) *inboundhttp.Server {
-	q := usecases.Queries{Reader: postgres.NewReader(ad.pool)}
+	q := usecases.Queries{Reader: postgres.NewReader(ad.pool), Inbound: postgres.NewInboundRepo(ad.pool), Clock: clock.System{}}
 	return &inboundhttp.Server{GetScorecard: q, ListScorecards: q, Readiness: readiness, Logger: logger}
 }
 

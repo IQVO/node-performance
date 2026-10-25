@@ -1,8 +1,9 @@
 # Default values for node-performance.
 #
-# One component: the api (cmd/api: REST, five Kafka consumers, the recompute
-# scheduler and the outbox relay in ONE process). No MCP server, frontend,
-# projector or reports binary exists in this service.
+# Two components: the api (cmd/api: REST, six Kafka consumers, the recompute
+# scheduler and the outbox relay in ONE process) and, both OFF by default,
+# the read-only MCP server (cmd/mcp, ADR 0007) and the web console remote
+# (ADR 0008). No projector or reports binary exists in this service.
 
 replicaCount: 1
 
@@ -107,7 +108,7 @@ config:
   # listener. Whole seconds ("5s" or "5"); "0" disables. The chart refuses a
   # terminationGracePeriodSeconds below this + 35.
   shutdownDrainDelay: "5s"
-  # The five consumer group ids. REQUIRED: the chart refuses to render an
+  # The six consumer group ids. REQUIRED: the chart refuses to render an
   # empty one and the binary refuses to boot without it. Use a STABLE,
   # service-prefixed id (never the pod name), so a rescheduled pod resumes
   # from its committed offsets.
@@ -116,6 +117,7 @@ config:
   deliveryPromiseConsumerGroup: ""       # DELIVERY_PROMISE_CONSUMER_GROUP
   offerAvailabilityConsumerGroup: ""     # OFFER_AVAILABILITY_CONSUMER_GROUP
   nodeTopologyConsumerGroup: ""          # NODE_TOPOLOGY_CONSUMER_GROUP
+  sellerInboundConsumerGroup: ""         # SELLER_INBOUND_CONSUMER_GROUP
 
 # The chart refuses to render unless database.url or database.existingSecret
 # is set. DATABASE_URL always reaches the pod through a secretKeyRef, never
@@ -134,7 +136,7 @@ database:
 # The chart refuses to render without it. Comma-separated host:port list.
 # Produced: retailnetwork.node-performance.events and
 # retailnetwork.node-performance.analytics. Consumed: the vendor-connectivity,
-# shipping-and-tracking, delivery-promise, offer-availability and
+# shipping-and-tracking, delivery-promise, offer-availability, seller-inbound and
 # node-topology topics.
 kafka:
   brokers: ""
@@ -178,3 +180,69 @@ terminationGracePeriodSeconds: 40
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# cmd/mcp (ADR 0007): the read-only MCP server (Streamable HTTP on /mcp). It
+# reads the service database through the existing queries and writes nothing:
+# no outbox relay, no consumer, no scheduler, no Kafka. No auth, by fleet
+# decision (the 2026-09-11 revert): the in-cluster ClusterIP boundary is the
+# access control.
+mcp:
+  enabled: false
+  replicaCount: 1
+  httpAddr: ":8090"                  # MCP_ADDR; its port must equal mcp.service.targetPort
+  # SERVICE_VERSION reported at boot; empty = the chart's appVersion.
+  serviceVersion: ""
+  # ENVIRONMENT name reported at boot.
+  environment: "production"
+  service:
+    type: ClusterIP
+    port: 8090
+    targetPort: 8090
+  # Gateway exposure: /api/mcp/node-performance -> Service :8090, prefix
+  # rewritten to /mcp. Needs the Gateway parentRef from the infra chart.
+  route:
+    enabled: false
+    path: "/api/mcp/node-performance"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  extraEnv: []
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# The web console remote (ADR 0008): an nginx pod serving the
+# node_performance_mfe Module Federation build. Static bytes only -- no
+# database, no Kafka, never routed by the Gateway API route (the Nginx web
+# gateway serves it under /mfes/node-performance/).
+frontend:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: warehouse/node-performance-frontend
+    pullPolicy: IfNotPresent
+    tag: ""
+  service:
+    port: 80
+    targetPort: 8080
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    fsGroup: 101
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi

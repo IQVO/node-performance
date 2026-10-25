@@ -109,6 +109,20 @@ channels:
         $ref: "#/components/messages/VendorShipmentConfirmed"
       SubmissionProcessed:
         $ref: "#/components/messages/SubmissionProcessed"
+      InboundReceiptSubmitted:
+        $ref: "#/components/messages/InboundReceiptSubmitted"
+  sellerInboundEvents:
+    address: retailnetwork.seller-inbound.events
+    title: seller-inbound integration topic (consumed)
+    description: |
+      The integration topic of seller-inbound, consumed by the node-performance
+      consumer group read from SELLER_INBOUND_CONSUMER_GROUP. Only
+      InboundShipmentShipped is relied on (ADR 0009). Tolerant decoding:
+      unknown types and unknown fields are ignored; every message is
+      deduplicated on the CloudEvents `id` in the inbox.
+    messages:
+      InboundShipmentShipped:
+        $ref: "#/components/messages/InboundShipmentShipped"
   shippingAndTrackingEvents:
     address: retailnetwork.shipping-and-tracking.events
     title: shipping-and-tracking integration topic (consumed)
@@ -192,7 +206,7 @@ operations:
   receiveVendorConnectivityEvents:
     action: receive
     title: Receive vendor-connectivity events
-    summary: Consume VendorOnboarded, PurchaseOrderIssued, PurchaseOrderAccepted, PurchaseOrderRejected, PurchaseOrderExpired, VendorShipmentConfirmed, SubmissionProcessed.
+    summary: Consume VendorOnboarded, PurchaseOrderIssued, PurchaseOrderAccepted, PurchaseOrderRejected, PurchaseOrderExpired, VendorShipmentConfirmed, SubmissionProcessed, InboundReceiptSubmitted.
     description: |
       Consumed from `retailnetwork.vendor-connectivity.events` under the consumer group named by
       VENDOR_CONNECTIVITY_CONSUMER_GROUP, dispatched on the full CloudEvents
@@ -210,6 +224,7 @@ operations:
       - $ref: "#/channels/vendorConnectivityEvents/messages/PurchaseOrderExpired"
       - $ref: "#/channels/vendorConnectivityEvents/messages/VendorShipmentConfirmed"
       - $ref: "#/channels/vendorConnectivityEvents/messages/SubmissionProcessed"
+      - $ref: "#/channels/vendorConnectivityEvents/messages/InboundReceiptSubmitted"
   receiveShippingAndTrackingEvents:
     action: receive
     title: Receive shipping-and-tracking events
@@ -256,6 +271,22 @@ operations:
       $ref: "#/channels/offerAvailabilityEvents"
     messages:
       - $ref: "#/channels/offerAvailabilityEvents/messages/InventoryFeedApplied"
+  receiveSellerInboundEvents:
+    action: receive
+    title: Receive seller-inbound events
+    summary: Consume InboundShipmentShipped.
+    description: |
+      Consumed from `retailnetwork.seller-inbound.events` under the consumer group named by
+      SELLER_INBOUND_CONSUMER_GROUP, dispatched on the full CloudEvents
+      `type`, idempotent on the CloudEvents `id` (inbox table
+      `processed_events`). Only the shipped instant of each shipment is kept
+      (table `inbound_shipments`). Other types on the topic are ignored.
+    tags:
+      - name: consumed
+    channel:
+      $ref: "#/channels/sellerInboundEvents"
+    messages:
+      - $ref: "#/channels/sellerInboundEvents/messages/InboundShipmentShipped"
   receiveNodeTopologyEvents:
     action: receive
     title: Receive node-topology events
@@ -509,6 +540,73 @@ components:
               trackingNumbers: ["trk-0001"]
               shippedAt: "2026-10-23T09:00:00Z"
               requiredShipBy: "2026-10-23T16:00:00Z"
+    InboundReceiptSubmitted:
+      name: InboundReceiptSubmitted
+      title: Inbound receipt submitted
+      summary: A vendor reported what its dock received against an inbound shipment.
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.inboundreceipt.InboundReceiptSubmitted`, from vendor-connectivity. Fields relied on: shipmentId, nodeId, receivedAt and the status of each carton. The receipt is kept as carton counts (RECEIVED over all reported) and joined by shipmentId to the shipped instant from InboundShipmentShipped; one receipt per shipment counts, the first. It raises no scorecard observation and never feeds the grade (ADR 0009). Every other field is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/InboundReceiptSubmittedEvent"
+      examples:
+        - name: inboundReceiptSubmitted
+          summary: A receipt with one received and one damaged carton.
+          payload:
+            specversion: "1.0"
+            id: "7c1d9a52-3e0b-4f6a-8d21-5b9e4a6c0f33"
+            source: "/retailnetwork/vendor-connectivity"
+            type: "com.retailnetwork.partner.vendor-connectivity.inboundreceipt.InboundReceiptSubmitted"
+            subject: "shp-5521"
+            time: "2026-10-23T11:00:02Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:vendor-connectivity:events:InboundReceiptSubmitted:v1"
+            data:
+              transactionId: "txn-9d41"
+              vendorId: "vendor-31"
+              nodeId: "node-0f3a91"
+              shipmentId: "shp-5521"
+              receivedAt: "2026-10-23T11:00:00Z"
+              cartons:
+                - sscc: "003400001234567895"
+                  status: RECEIVED
+                  items:
+                    - gtin: "09501101530003"
+                      qtyEaches: 12
+                  complianceCodes: []
+                - sscc: "003400001234567901"
+                  status: DAMAGED
+                  items: []
+                  complianceCodes: ["CRUSHED"]
+    InboundShipmentShipped:
+      name: InboundShipmentShipped
+      title: Inbound shipment shipped
+      summary: A seller shipped an inbound shipment towards a node.
+      description: "`type` = `com.retailnetwork.partner.seller-inbound.inboundshipment.InboundShipmentShipped`, from seller-inbound (topic `retailnetwork.seller-inbound.events`). Fields relied on: shipmentId, nodeId, shippedAt. The shipped instant is kept per shipment (the first one wins) so a receipt can be joined to it, whichever of the two events arrives first. It raises no scorecard observation (ADR 0009). Every other field (planId, sellerId, ...) is ignored."
+      contentType: application/cloudevents+json
+      tags:
+        - name: consumed
+      payload:
+        $ref: "#/components/schemas/InboundShipmentShippedEvent"
+      examples:
+        - name: inboundShipmentShipped
+          summary: A shipment left the seller towards the node.
+          payload:
+            specversion: "1.0"
+            id: "0e5b7f10-2a44-4d8c-b3e9-61c7d2a8f905"
+            source: "/retailnetwork/seller-inbound"
+            type: "com.retailnetwork.partner.seller-inbound.inboundshipment.InboundShipmentShipped"
+            subject: "shp-5521"
+            time: "2026-10-21T09:00:02Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:seller-inbound:events:InboundShipmentShipped:v1"
+            data:
+              shipmentId: "shp-5521"
+              planId: "plan-77"
+              sellerId: "seller-12"
+              nodeId: "node-0f3a91"
+              shippedAt: "2026-10-21T09:00:00Z"
     SubmissionProcessed:
       name: SubmissionProcessed
       title: Submission processed
@@ -857,6 +955,39 @@ components:
                 poNumber: { type: string }
                 nodeId: { type: string }
                 requiredShipBy: { type: string, format: date-time }
+    InboundReceiptSubmittedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.vendor-connectivity.inboundreceipt.InboundReceiptSubmitted" }
+            data:
+              type: object
+              required: [shipmentId, nodeId, receivedAt, cartons]
+              properties:
+                shipmentId: { type: string }
+                nodeId: { type: string }
+                receivedAt: { type: string, format: date-time }
+                cartons:
+                  type: array
+                  items:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: { type: string, enum: [RECEIVED, MISSING, UNEXPECTED, DAMAGED] }
+    InboundShipmentShippedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            type: { const: "com.retailnetwork.partner.seller-inbound.inboundshipment.InboundShipmentShipped" }
+            data:
+              type: object
+              required: [shipmentId, nodeId, shippedAt]
+              properties:
+                shipmentId: { type: string }
+                nodeId: { type: string }
+                shippedAt: { type: string, format: date-time }
     SubmissionProcessedEvent:
       allOf:
         - $ref: "#/components/schemas/CloudEventEnvelope"

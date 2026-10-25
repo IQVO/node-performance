@@ -156,3 +156,50 @@ func (i *Inbox) MarkProcessed(ctx context.Context, eventID, eventType string, at
 	i.s.processed[eventID] = processedRow{eventType: eventType, at: at}
 	return true, nil
 }
+
+// Inbound is the in-memory ports.InboundRepository and ports.InboundReader.
+type Inbound struct{ s *Store }
+
+// SaveShipment stores the shipped instant; the first one wins.
+func (r *Inbound) SaveShipment(ctx context.Context, sh scorecard.InboundShipment) (bool, error) {
+	defer r.s.enter(ctx)()
+	if _, ok := r.s.shipments[sh.ShipmentID]; ok {
+		return false, nil
+	}
+	r.s.shipments[sh.ShipmentID] = sh
+	return true, nil
+}
+
+// SaveReceipt stores the receipt; the first receipt of a shipment wins.
+func (r *Inbound) SaveReceipt(ctx context.Context, rc scorecard.InboundReceipt) (bool, error) {
+	defer r.s.enter(ctx)()
+	if _, ok := r.s.receipts[rc.ShipmentID]; ok {
+		return false, nil
+	}
+	r.s.receipts[rc.ShipmentID] = rc
+	return true, nil
+}
+
+// Observations joins the stored receipts to their shipments.
+func (r *Inbound) Observations(ctx context.Context, nodes []scorecard.NodeID, after time.Time) (map[scorecard.NodeID][]scorecard.InboundObservation, error) {
+	defer r.s.enter(ctx)()
+	want := map[scorecard.NodeID]bool{}
+	for _, n := range nodes {
+		want[n] = true
+	}
+	out := map[scorecard.NodeID][]scorecard.InboundObservation{}
+	ids := make([]string, 0, len(r.s.receipts))
+	for id := range r.s.receipts {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		rc := r.s.receipts[id]
+		sh, joined := r.s.shipments[id]
+		if !want[rc.NodeID] || !joined || !rc.ReceivedAt.After(after) {
+			continue
+		}
+		out[rc.NodeID] = append(out[rc.NodeID], scorecard.JoinInbound(rc, sh.ShippedAt))
+	}
+	return out, nil
+}

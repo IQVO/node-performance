@@ -101,8 +101,8 @@ Kafka off.
 {{- end -}}
 
 {{/*
-All five consumers always run, each under a STABLE consumer group id that must
-come from values: cmd/api exits at boot without any of the five. A stable id
+All six consumers always run, each under a STABLE consumer group id that must
+come from values: cmd/api exits at boot without any of the six. A stable id
 is what lets a rescheduled pod resume from its committed offsets; an id
 derived from the pod name (an env expansion such as $(POD_NAME)) would not.
 */}}
@@ -112,7 +112,8 @@ derived from the pod name (an env expansion such as $(POD_NAME)) would not.
     (dict "key" "shippingAndTrackingConsumerGroup" "env" "SHIPPING_AND_TRACKING_CONSUMER_GROUP")
     (dict "key" "deliveryPromiseConsumerGroup" "env" "DELIVERY_PROMISE_CONSUMER_GROUP")
     (dict "key" "offerAvailabilityConsumerGroup" "env" "OFFER_AVAILABILITY_CONSUMER_GROUP")
-    (dict "key" "nodeTopologyConsumerGroup" "env" "NODE_TOPOLOGY_CONSUMER_GROUP") -}}
+    (dict "key" "nodeTopologyConsumerGroup" "env" "NODE_TOPOLOGY_CONSUMER_GROUP")
+    (dict "key" "sellerInboundConsumerGroup" "env" "SELLER_INBOUND_CONSUMER_GROUP") -}}
 {{- $v := toString (index $.Values.config $c.key) -}}
 {{- if or (eq $v "") (eq $v "<nil>") -}}
 {{- fail (printf "config.%s is required (%s): the consumer always runs and cmd/api exits at boot without a group. Use a STABLE, service-prefixed id (for example node-performance-<topic>), never the pod name." $c.key $c.env) -}}
@@ -131,7 +132,7 @@ from values (a consumer group overridden through extraEnv would bypass the
 checks above).
 */}}
 {{- define "node-performance.requireCleanExtraEnv" -}}
-{{- $managed := list "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "HTTP_ADDR" "RECOMPUTE_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "LOG_LEVEL" "VENDOR_CONNECTIVITY_CONSUMER_GROUP" "SHIPPING_AND_TRACKING_CONSUMER_GROUP" "DELIVERY_PROMISE_CONSUMER_GROUP" "OFFER_AVAILABILITY_CONSUMER_GROUP" "NODE_TOPOLOGY_CONSUMER_GROUP" -}}
+{{- $managed := list "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "HTTP_ADDR" "RECOMPUTE_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "LOG_LEVEL" "VENDOR_CONNECTIVITY_CONSUMER_GROUP" "SHIPPING_AND_TRACKING_CONSUMER_GROUP" "DELIVERY_PROMISE_CONSUMER_GROUP" "OFFER_AVAILABILITY_CONSUMER_GROUP" "NODE_TOPOLOGY_CONSUMER_GROUP" "SELLER_INBOUND_CONSUMER_GROUP" -}}
 {{- range .Values.extraEnv -}}
 {{- $name := toString .name -}}
 {{- if hasSuffix "_MODE" $name -}}
@@ -192,3 +193,10 @@ Deployment (always rendered) includes it, so a mis-set release fails
 {{- include "node-performance.requireGracePeriod" . -}}
 {{- include "node-performance.requireHTTPPort" . -}}
 {{- end -}}
+
+{{/*
+Fully qualified name of the MCP server Deployment/Service (cmd/mcp, ADR 0007).
+*/}}
+{{- define "node-performance.mcpFullname" -}}
+{{- include "node-performance.fullname" . }}-mcp
+{{- end }}

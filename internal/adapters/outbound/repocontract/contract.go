@@ -15,12 +15,14 @@ import (
 
 // Fixture is one implementation of every port, over ONE empty database.
 type Fixture struct {
-	Scorecards ports.ScorecardRepository
-	Reader     ports.ScorecardReader
-	Facts      ports.PurchaseOrderFactsRepository
-	Inbox      ports.ProcessedEvents
-	Outbox     ports.EventOutbox
-	UoW        ports.UnitOfWork
+	Scorecards    ports.ScorecardRepository
+	Reader        ports.ScorecardReader
+	Facts         ports.PurchaseOrderFactsRepository
+	Inbound       ports.InboundRepository
+	InboundReader ports.InboundReader
+	Inbox         ports.ProcessedEvents
+	Outbox        ports.EventOutbox
+	UoW           ports.UnitOfWork
 	// OutboxCount returns how many events are stored in the outbox. Nil skips
 	// the outbox atomicity checks.
 	OutboxCount func(ctx context.Context) (int, error)
@@ -45,6 +47,7 @@ func Run(t *testing.T, factory Factory) {
 		{"Scorecard", scorecardCases},
 		{"Reader", readerCases},
 		{"PurchaseOrderFacts", factsCases},
+		{"Inbound", inboundCases},
 		{"Inbox", inboxCases},
 		{"UnitOfWork", unitOfWorkCases},
 	}

@@ -1,7 +1,7 @@
 # Runtime: configuration, probes, shutdown, workers and the outbox
 
 `cmd/api` is the only binary. It runs on real PostgreSQL and real Kafka; there is no
-alternative runtime and no log sink. Next to the REST API it runs five Kafka
+alternative runtime and no log sink. Next to the REST API it runs six Kafka
 consumers, a recompute scheduler and the outbox relay.
 
 ## Environment
@@ -16,6 +16,7 @@ consumers, a recompute scheduler and the outbox relay.
 | `DELIVERY_PROMISE_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.delivery-promise.events`. |
 | `OFFER_AVAILABILITY_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.offer-availability.events`. |
 | `NODE_TOPOLOGY_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.node-topology.events`. |
+| `SELLER_INBOUND_CONSUMER_GROUP` | required | Group of the consumer of `retailnetwork.seller-inbound.events` (the shipped instant of each inbound shipment, ADR 0009). |
 | `HTTP_ADDR` | `:8080` | Listen address. |
 | `RECOMPUTE_INTERVAL` | `1m` | How often the scheduler recomputes the due scorecards (Go duration or seconds). |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Poll interval of the relay (Go duration or seconds). |
@@ -29,7 +30,7 @@ never derived from the pod name: it is a chart value.
 ## Boot and shutdown
 
 1. Validate the environment. 2. Run the embedded migrations and ping Postgres, both with
-exponential backoff (5 attempts, 1 + 2 + 4 + 8 s). 3. Start the five consumers, the
+exponential backoff (5 attempts, 1 + 2 + 4 + 8 s). 3. Start the six consumers, the
 recompute scheduler and the outbox relay (none dials at construction; a broker that is
 down only makes fetches and passes fail until it is back). 4. Serve.
 

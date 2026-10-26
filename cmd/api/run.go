@@ -17,6 +17,7 @@ import (
 	"github.com/claudioed/node-performance/internal/adapters/outbound/clock"
 	outboundkafka "github.com/claudioed/node-performance/internal/adapters/outbound/kafka"
 	"github.com/claudioed/node-performance/internal/adapters/outbound/postgres"
+	"github.com/claudioed/node-performance/internal/adapters/outbound/telemetry"
 	"github.com/claudioed/node-performance/internal/application/usecases"
 	"github.com/claudioed/node-performance/internal/bootretry"
 )
@@ -24,7 +25,9 @@ import (
 // run boots the service and serves until SIGINT/SIGTERM or until ctx is
 // cancelled (the integration test stops the real entry point that way).
 func run(ctx context.Context) error {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: newLogLevel(os.Getenv(envLogLevel))}))
+	// The handler is wrapped so a record written with a span-carrying context
+	// (the *Context slog variants) also carries trace_id and span_id.
+	logger := slog.New(telemetry.WithTraceContext(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: newLogLevel(os.Getenv(envLogLevel))})))
 	slog.SetDefault(logger)
 
 	// Misconfiguration is refused before anything is opened or bound.
@@ -32,6 +35,16 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// Telemetry comes up before the router is built (otelchimetric binds the
+	// global MeterProvider at construction) and is flushed LAST: deferred before
+	// everything below, so the final spans of the drain still leave the process.
+	tel := loadTelemetryEnv(os.Getenv)
+	flushTelemetry, err := startTelemetry(logger, tel)
+	if err != nil {
+		return err
+	}
+	defer flushTelemetry()
+
 	// closeAdapters (pool.Close) is deferred FIRST so it runs LAST, after the
 	// HTTP drain, the consumers and the relay have all stopped.
 	ad, closeAdapters, err := buildAdapters(ctx, cfg, logger)
@@ -41,7 +54,7 @@ func run(ctx context.Context) error {
 	defer closeAdapters()
 
 	readiness := newReadiness(ad.pool.Ping, cfg.brokers)
-	handler, err := inboundhttp.NewRouter(buildServer(ad, readiness, logger))
+	handler, err := inboundhttp.NewRouter(buildServer(ad, readiness, logger, tel.serviceName))
 	if err != nil {
 		return err
 	}
@@ -121,9 +134,9 @@ func postgresAdapters(pool *pgxpool.Pool) adapters {
 }
 
 // buildServer wires the query use cases into the REST server.
-func buildServer(ad adapters, readiness *inboundhttp.Readiness, logger *slog.Logger) *inboundhttp.Server {
+func buildServer(ad adapters, readiness *inboundhttp.Readiness, logger *slog.Logger, serviceName string) *inboundhttp.Server {
 	q := usecases.Queries{Reader: postgres.NewReader(ad.pool), Inbound: postgres.NewInboundRepo(ad.pool), Clock: clock.System{}}
-	return &inboundhttp.Server{GetScorecard: q, ListScorecards: q, Readiness: readiness, Logger: logger}
+	return &inboundhttp.Server{GetScorecard: q, ListScorecards: q, Readiness: readiness, Logger: logger, ServiceName: serviceName}
 }
 
 // serveUntilSignal runs httpServer until SIGINT/SIGTERM, ctx cancellation or a

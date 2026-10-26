@@ -20,8 +20,10 @@
 //	DATABASE_URL             REQUIRED. Postgres DSN (the service database cmd/api owns)
 //	MIGRATIONS_DATABASE_URL  direct DSN for the boot migrations (default DATABASE_URL)
 //	LOG_LEVEL                debug | info | warn | error (default info)
-//	SERVICE_VERSION          version reported at boot (default "dev")
-//	ENVIRONMENT              environment name reported at boot (default "local")
+//	OTEL_SERVICE_NAME        service.name of spans and metrics (default node-performance-mcp)
+//	OTEL_EXPORTER_OTLP_ENDPOINT  Collector OTLP/gRPC endpoint (default telemetry.DefaultEndpoint); export never blocks
+//	SERVICE_VERSION          service.version, reported at boot too (default "dev")
+//	ENVIRONMENT              deployment.environment.name, reported at boot too (default "local")
 package main
 
 import (
@@ -37,6 +39,7 @@ import (
 
 	inboundmcp "github.com/claudioed/node-performance/internal/adapters/inbound/mcp"
 	"github.com/claudioed/node-performance/internal/adapters/outbound/postgres"
+	"github.com/claudioed/node-performance/internal/adapters/outbound/telemetry"
 	"github.com/claudioed/node-performance/internal/application/usecases"
 	"github.com/claudioed/node-performance/internal/bootretry"
 )
@@ -58,6 +61,16 @@ func main() {
 func run() error {
 	logger := newLogger(getenv("LOG_LEVEL", "info"))
 	slog.SetDefault(logger)
+
+	// Telemetry comes up before the router is built (otelchimetric binds the
+	// global MeterProvider at construction) and is flushed last.
+	tel := loadTelemetryEnv(os.Getenv)
+	flushTelemetry, err := startTelemetry(logger, tel)
+	if err != nil {
+		return err
+	}
+	defer flushTelemetry()
+
 	logger.Info("mcp server starting",
 		"service_version", getenv("SERVICE_VERSION", "dev"),
 		"environment", getenv("ENVIRONMENT", "local"),
@@ -72,7 +85,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              getenv("MCP_ADDR", ":8090"),
-		Handler:           newRouter(inboundmcp.Handler(inboundmcp.NewServer(deps))),
+		Handler:           newRouter(inboundmcp.Handler(inboundmcp.NewServer(deps)), logger, tel.serviceName),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	return serveMCP(logger, srv)
@@ -156,7 +169,7 @@ func newLogger(level string) *slog.Logger {
 	default:
 		lvl = slog.LevelInfo
 	}
-	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl}))
+	return slog.New(telemetry.WithTraceContext(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})))
 }
 
 func getenv(key, fallback string) string {

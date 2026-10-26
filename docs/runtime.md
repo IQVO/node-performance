@@ -23,6 +23,9 @@ consumers, a recompute scheduler and the outbox relay.
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row; `0` = unlimited (ADR 0005). |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait between flipping `/readyz` to 503 and closing the listener; `0` disables. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`. |
+| `OTEL_SERVICE_NAME` | `node-performance` | `service.name` of spans and metrics (ADR 0010). |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | Collector OTLP/gRPC, `host:port` or URL; export never blocks. |
+| `SERVICE_VERSION` / `ENVIRONMENT` | `dev` / `local` | `service.version` / `deployment.environment.name`. |
 
 Configuration errors are raised before anything is opened or bound. A group id is
 never derived from the pod name: it is a chart value.
@@ -92,6 +95,9 @@ DSNs.
   the binary falls back to `DATABASE_URL`), `kafka.brokers`, and `config.vendorConnectivityConsumerGroup`,
   `shippingAndTrackingConsumerGroup`, `deliveryPromiseConsumerGroup`, `offerAvailabilityConsumerGroup`,
   `nodeTopologyConsumerGroup`.
+- Observability (ADR 0010): `otel.enabled`, `otel.endpoint`, `otel.serviceName` render `OTEL_EXPORTER_OTLP_ENDPOINT` and
+  `OTEL_SERVICE_NAME` (`<name>-mcp` for the mcp component); `SERVICE_VERSION` is `image.tag` or the appVersion, `ENVIRONMENT` is
+  `environment`. `extraEnv` may not set any of the four.
 - Also refused: a group id that is an env expansion (`$(POD_NAME)`), any `*_MODE` or chart-managed variable in `extraEnv`,
   a `config.httpAddr` port that is not `service.targetPort`, and a `terminationGracePeriodSeconds` below
   `config.shutdownDrainDelay` + 35 s (the sum of the bounds above plus 5 s of margin; 40 s with the default drain).

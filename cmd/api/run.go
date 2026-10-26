@@ -53,6 +53,13 @@ func run(ctx context.Context) error {
 	}
 	defer closeAdapters()
 
+	// The business counter binds to the MeterProvider telemetry.Setup installed.
+	scorecardMetrics, err := telemetry.NewScorecardMetrics()
+	if err != nil {
+		return err
+	}
+	ad.deps.Metrics = scorecardMetrics
+
 	readiness := newReadiness(ad.pool.Ping, cfg.brokers)
 	handler, err := inboundhttp.NewRouter(buildServer(ad, readiness, logger, tel.serviceName))
 	if err != nil {

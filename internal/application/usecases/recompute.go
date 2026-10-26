@@ -47,6 +47,7 @@ func (r Recompute) Run(ctx context.Context) (RecomputeResult, error) {
 		}
 		for _, id := range ids {
 			events, err := r.one(ctx, id)
+			r.recordOutcome(ctx, events, err)
 			switch {
 			case errors.Is(err, ports.ErrConcurrentUpdate):
 				res.Conflicts++
@@ -92,4 +93,22 @@ func (r Recompute) one(ctx context.Context, id string) (int, error) {
 		return nil
 	})
 	return raised, err
+}
+
+// internalErrorReason is the reason of every recompute failure that is not a
+// lost concurrency race (a database error, a bug).
+const internalErrorReason = "internal-error"
+
+// recordOutcome counts one scorecard recompute: recomputed when it ran, failed
+// with the reason otherwise. A scorecard that vanished or was no longer due
+// (events < 0, no error) is not an attempt.
+func (r Recompute) recordOutcome(ctx context.Context, events int, err error) {
+	switch {
+	case errors.Is(err, ports.ErrConcurrentUpdate):
+		r.metrics().ScorecardRecomputeFailed(ctx, "concurrent-update")
+	case err != nil:
+		r.metrics().ScorecardRecomputeFailed(ctx, internalErrorReason)
+	case events >= 0:
+		r.metrics().ScorecardRecomputed(ctx)
+	}
 }

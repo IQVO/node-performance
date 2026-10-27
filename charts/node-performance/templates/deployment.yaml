@@ -84,6 +84,18 @@ spec:
               value: {{ .Values.config.nodeTopologyConsumerGroup | quote }}
             - name: SELLER_INBOUND_CONSUMER_GROUP
               value: {{ .Values.config.sellerInboundConsumerGroup | quote }}
+            # Observability env (ADR 0010): the same three for every component,
+            # plus ENVIRONMENT for deployment.environment.name.
+            - name: ENVIRONMENT
+              value: {{ .Values.environment | quote }}
+            - name: SERVICE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.otel.serviceName | quote }}
+            {{- end }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

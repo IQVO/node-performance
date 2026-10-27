@@ -72,6 +72,9 @@ func (r *OutboxRepo) Append(ctx context.Context, events ...shared.Event) error {
 		if err != nil {
 			return fmt.Errorf("encode %s: %w", ev.EventName(), err)
 		}
+		// The span active on ctx rides with the row (same transaction), so the
+		// relay publishes it and a consumer span can parent on it.
+		msg = withTraceHeaders(ctx, []outbox.Message{msg})[0]
 		headers, err := marshalHeaders(msg.Headers)
 		if err != nil {
 			return fmt.Errorf("marshal outbox headers for %s: %w", msg.EventType, err)

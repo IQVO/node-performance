@@ -28,7 +28,24 @@ type Deps struct {
 	Outbox     ports.EventOutbox
 	UoW        ports.UnitOfWork
 	Clock      ports.Clock
+	// Metrics records the business outcome of each recompute; nil records
+	// nothing, so unit tests need no wiring.
+	Metrics ports.ScorecardMetrics
 }
+
+// metrics returns the configured ScorecardMetrics or a no-op.
+func (d Deps) metrics() ports.ScorecardMetrics {
+	if d.Metrics != nil {
+		return d.Metrics
+	}
+	return noMetrics{}
+}
+
+// noMetrics is the ScorecardMetrics of a Deps without one.
+type noMetrics struct{}
+
+func (noMetrics) ScorecardRecomputed(context.Context)              {}
+func (noMetrics) ScorecardRecomputeFailed(context.Context, string) {}
 
 // writer is what every command embeds.
 type writer struct{ Deps }

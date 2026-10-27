@@ -132,14 +132,14 @@ from values (a consumer group overridden through extraEnv would bypass the
 checks above).
 */}}
 {{- define "node-performance.requireCleanExtraEnv" -}}
-{{- $managed := list "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "HTTP_ADDR" "RECOMPUTE_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "LOG_LEVEL" "VENDOR_CONNECTIVITY_CONSUMER_GROUP" "SHIPPING_AND_TRACKING_CONSUMER_GROUP" "DELIVERY_PROMISE_CONSUMER_GROUP" "OFFER_AVAILABILITY_CONSUMER_GROUP" "NODE_TOPOLOGY_CONSUMER_GROUP" "SELLER_INBOUND_CONSUMER_GROUP" -}}
+{{- $managed := list "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "HTTP_ADDR" "RECOMPUTE_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "LOG_LEVEL" "VENDOR_CONNECTIVITY_CONSUMER_GROUP" "SHIPPING_AND_TRACKING_CONSUMER_GROUP" "DELIVERY_PROMISE_CONSUMER_GROUP" "OFFER_AVAILABILITY_CONSUMER_GROUP" "NODE_TOPOLOGY_CONSUMER_GROUP" "SELLER_INBOUND_CONSUMER_GROUP" "ENVIRONMENT" "SERVICE_VERSION" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
 {{- range .Values.extraEnv -}}
 {{- $name := toString .name -}}
 {{- if hasSuffix "_MODE" $name -}}
 {{- fail (printf "extraEnv sets %s - *_MODE variables are refused: node-performance runs on real Postgres and real Kafka only, with no permissive, log or off mode." $name) -}}
 {{- end -}}
 {{- if has $name $managed -}}
-{{- fail (printf "extraEnv sets %s - the chart already renders it from values (config.*, database.*, kafka.brokers); set it there." $name) -}}
+{{- fail (printf "extraEnv sets %s - the chart already renders it from values (config.*, database.*, kafka.brokers, otel.*, environment); set it there." $name) -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

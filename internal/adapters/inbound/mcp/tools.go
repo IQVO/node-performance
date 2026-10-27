@@ -127,7 +127,7 @@ func toScorecardPage(page views.ScorecardPage) scorecardPageView {
 func (d Deps) getScorecard(ctx context.Context, in nodeInput) (nodeScorecardsView, error) {
 	got, err := d.GetScorecard.GetScorecard(ctx, in.NodeID)
 	if err != nil {
-		return nodeScorecardsView{}, mapError(err)
+		return nodeScorecardsView{}, mapError(ctx, err)
 	}
 	return toNodeScorecards(got), nil
 }
@@ -137,7 +137,7 @@ func (d Deps) listScorecardsByGrade(ctx context.Context, in listScorecardsInput)
 		Grade: in.Grade, Window: in.Window, Limit: in.Limit, After: in.After,
 	})
 	if err != nil {
-		return scorecardPageView{}, mapError(err)
+		return scorecardPageView{}, mapError(ctx, err)
 	}
 	return toScorecardPage(page), nil
 }

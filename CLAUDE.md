@@ -39,3 +39,5 @@ Aggregate, metric definitions and assumptions A1-A23 are in docs/adr/0002; consu
 ## Workflow
 GitFlow: feature/* -> PR into develop, CI green before merge, never push develop or main. lefthook: pre-commit fmt/vet/lint, pre-push `make check`. Commit and push after each step.
 Deploy: charts/node-performance (api only; DSN from a Secret, five `config.*ConsumerGroup` values and `kafka.brokers` required, grace period >= drain + 35 s); tests `bash charts/node-performance/tests/render_test.sh` and `python3 charts/node-performance/tests/test_service_selectors.py`. Open follow-up: repository secrets (docs/before-first-release.md row 11).
+
+A2A: `cmd/a2a` (port 8093) is this context's read-only Agent2Agent agent, skills `node_performance` (read), `nodes_by_grade` (read), decided in `docs/adr/0011-a2a-inbound-adapter.md`; delegation only (facts stay CloudEvents on Kafka), unauthenticated like REST and MCP; rules in `.claude/rules/fleet/a2a.md`.

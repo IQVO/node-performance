@@ -200,3 +200,10 @@ Fully qualified name of the MCP server Deployment/Service (cmd/mcp, ADR 0007).
 {{- define "node-performance.mcpFullname" -}}
 {{- include "node-performance.fullname" . }}-mcp
 {{- end }}
+
+{{/*
+Fully qualified name of the A2A agent Deployment/Service (cmd/a2a, ADR 0011).
+*/}}
+{{- define "node-performance.a2aFullname" -}}
+{{- include "node-performance.fullname" . }}-a2a
+{{- end }}

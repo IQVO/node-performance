@@ -85,7 +85,7 @@ must exceed it.
 
 ## Deployment (Helm)
 
-`charts/node-performance/` deploys the `api` and nothing else (no MCP, frontend, projector or reports).
+`charts/node-performance/` deploys the `api` and nothing else by default (no MCP, A2A, frontend, projector or reports; mcp, a2a and frontend are opt-in).
 `values.yaml` documents every key; each `config.*` value maps 1:1 to one variable of the table above, and the
 chart ConfigMap (mounted with `envFrom`, with a `checksum/config` pod annotation) carries every one of them except the two
 DSNs.
@@ -96,7 +96,7 @@ DSNs.
   `shippingAndTrackingConsumerGroup`, `deliveryPromiseConsumerGroup`, `offerAvailabilityConsumerGroup`,
   `nodeTopologyConsumerGroup`.
 - Observability (ADR 0010): `otel.enabled`, `otel.endpoint`, `otel.serviceName` render `OTEL_EXPORTER_OTLP_ENDPOINT` and
-  `OTEL_SERVICE_NAME` (`<name>-mcp` for the mcp component); `SERVICE_VERSION` is `image.tag` or the appVersion, `ENVIRONMENT` is
+  `OTEL_SERVICE_NAME` (`<name>-mcp` for the mcp component, `<name>-a2a` for a2a); `SERVICE_VERSION` is `image.tag` or the appVersion, `ENVIRONMENT` is
   `environment`. `extraEnv` may not set any of the four.
 - Also refused: a group id that is an env expansion (`$(POD_NAME)`), any `*_MODE` or chart-managed variable in `extraEnv`,
   a `config.httpAddr` port that is not `service.targetPort`, and a `terminationGracePeriodSeconds` below

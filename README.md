@@ -46,6 +46,24 @@ idempotent boot migrations like `cmd/api`. In the chart it is behind
 `mcp.enabled` (off by default), with its own ClusterIP Service and an optional
 Gateway API route (`/api/mcp/node-performance` rewritten to `/mcp`).
 
+### A2A agent (read-only)
+
+`cmd/a2a` is a third, independent deployable (ADR 0011): an Agent2Agent
+(A2A) message-only agent over `github.com/a2aproject/a2a-go/v2`, JSON-RPC at `/`
+and `/a2a` on `:8093` (`A2A_ADDR`), the Agent Card at
+`/.well-known/agent-card.json`, an open `/healthz`, no auth (fleet decision).
+`A2A_AGENT_URL` (the absolute URL the card advertises) is mandatory. Two
+goal-shaped read skills over the same use cases as REST and MCP:
+`node_performance` (`{nodeId}`) and `nodes_by_grade`
+(`{grade, window?, limit?, after?}`); input is `{"skill","arguments"}` in the
+first message part, decoded strictly, and rejections are answered in-band as
+RFC 7807-shaped problems with the REST classes (404/422/500, plus 400 for a
+malformed request or unknown skill). Like `cmd/mcp` it reads only
+(`DATABASE_URL`, optional `MIGRATIONS_DATABASE_URL`): no Kafka, consumers,
+scheduler or outbox. In the chart it is behind `a2a.enabled` (off by default),
+with its own ClusterIP Service and an optional Gateway API route
+(`/api/a2a/node-performance` rewritten to `/`).
+
 ### Web console remote
 
 `web/` is the `node_performance_mfe` Module Federation remote (ADR 0008): a
@@ -68,7 +86,7 @@ warehouse-systems fleet; the fleet reaches the network only through the `vendor-
 
 Decisions are in [`docs/adr/`](docs/adr/index.md): the aggregate and its invariants with numbered assumptions (0002),
 consumed contracts and local facts (0003), the CloudEvents catalogue (0004), the outbox relay (0005), the HTTP adapter,
-consumers and readiness (0006), the read-only MCP server (0007), the web console remote (0008), the informational inbound timeliness and accuracy metrics (0009). Configuration, probes and shutdown are in [`docs/runtime.md`](docs/runtime.md); the packaging
+consumers and readiness (0006), the read-only MCP server (0007), the web console remote (0008), the informational inbound timeliness and accuracy metrics (0009), the fleet observability standard (0010), the read-only A2A agent (0011). Configuration, probes and shutdown are in [`docs/runtime.md`](docs/runtime.md); the packaging
 checklist is [`docs/before-first-release.md`](docs/before-first-release.md).
 
 ## Runtime
@@ -81,15 +99,15 @@ with problem+json, dependency-aware `/readyz`.
 ## Observability
 
 Logs, metrics and traces follow the fleet standard ([ADR 0010](docs/adr/0010-fleet-observability-standard.md)): JSON logs on stdout carry
-`trace_id`/`span_id` and a `request_id`; `cmd/api` and `cmd/mcp` export OTLP/gRPC to the Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+`trace_id`/`span_id` and a `request_id`; `cmd/api`, `cmd/mcp` and `cmd/a2a` export OTLP/gRPC to the Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`,
 `OTEL_SERVICE_NAME`, `SERVICE_VERSION`, `ENVIRONMENT`; export never blocks, so no Collector costs telemetry, nothing else) with HTTP request
 duration, Go runtime metrics and the business counter `nodeperformance.scorecards.recomputed` (`outcome`, `reason`); the trace continues across
 Kafka in the `traceparent` header of each published event and is picked up by the consumers. The chart's `otel.*` values render the env.
 
 ## Deployment
 
-Helm chart: [`charts/node-performance/`](charts/node-performance/): the `api` always, plus the optional `mcp` and
-`frontend` components (both off by default). It refuses to render without
+Helm chart: [`charts/node-performance/`](charts/node-performance/): the `api` always, plus the optional `mcp`, `a2a` and
+`frontend` components (all off by default). It refuses to render without
 `database.url` or `database.existingSecret` (the DSN always reaches the pod through a Secret), `kafka.brokers`, the six
 `config.*ConsumerGroup` ids (stable, service-prefixed, never the pod name) and a `terminationGracePeriodSeconds` of at least
 `config.shutdownDrainDelay` + 35 s (40 s by default). Defaults to the image `ghcr.io/iqvo/node-performance:v<appVersion>`.

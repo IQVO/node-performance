@@ -9,7 +9,7 @@ every Service selects on it, so each Service selects EXACTLY ONE Deployment.
 This test fails if that ever stops being true.
 
 Components: api (always), mcp (cmd/mcp, the read-only MCP server of ADR
-0007) and frontend (the nginx pod serving the node_performance_mfe Module
+0007), a2a (cmd/a2a, the read-only A2A agent of ADR 0011) and frontend (the nginx pod serving the node_performance_mfe Module
 Federation build, ADR 0008) -- both optional and off by default, as are the
 HPA, Ingress and HTTPRoute. The frontend is never routed by this chart (the
 Nginx web gateway serves it). The test renders everything enabled and the
@@ -60,11 +60,17 @@ ENABLE_EVERYTHING = BASE + [
     "--set", "gatewayApi.parentRefs[0].name=gw",
     "--set", "gatewayApi.parentRefs[0].namespace=infra",
     "--set", "mcp.enabled=true",
+    "--set", "a2a.enabled=true",
     "--set", "frontend.enabled=true",
 ]
 
 # Every env var cmd/mcp reads (cmd/mcp/main.go).
-MCP_ENV = ("MCP_ADDR", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL", "MIGRATIONS_DATABASE_URL")
+MCP_ENV = ("MCP_ADDR", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL", "MIGRATIONS_DATABASE_URL",
+           "OTEL_SERVICE_NAME", "OTEL_EXPORTER_OTLP_ENDPOINT")
+
+# Every env var cmd/a2a reads (cmd/a2a/main.go, telemetry.go).
+A2A_ENV = ("A2A_ADDR", "A2A_AGENT_URL", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL",
+           "MIGRATIONS_DATABASE_URL", "OTEL_SERVICE_NAME", "OTEL_EXPORTER_OTLP_ENDPOINT")
 
 # Every env var cmd/api reads.
 API_ENV = (
@@ -74,6 +80,7 @@ API_ENV = (
     "SELLER_INBOUND_CONSUMER_GROUP",
     "HTTP_ADDR", "RECOMPUTE_INTERVAL", "OUTBOX_RELAY_INTERVAL", "OUTBOX_MAX_ATTEMPTS",
     "SHUTDOWN_DRAIN_DELAY", "LOG_LEVEL",
+    "SERVICE_VERSION", "ENVIRONMENT", "OTEL_SERVICE_NAME", "OTEL_EXPORTER_OTLP_ENDPOINT",
 )
 
 
@@ -181,6 +188,27 @@ def check_mcp(deployments: dict, services: dict, failures: list[str]) -> None:
             failures.append(f"the MCP Deployment must not render {banned} (read-only, never dials Kafka)")
 
 
+def check_a2a(deployments: dict, services: dict, failures: list[str]) -> None:
+    name = f"{RELEASE}-a2a"
+    if not pins(services.get(name), "a2a"):
+        failures.append("the A2A Service must exist and pin component=a2a")
+    if name not in deployments:
+        failures.append("the A2A Deployment was not rendered with a2a.enabled=true")
+        return
+    if command_of(deployments[name]) != ["/app/a2a"]:
+        failures.append("the A2A Deployment must run /app/a2a")
+    env = env_names(deployments[name])
+    for want in A2A_ENV:
+        if want not in env:
+            failures.append(f"the A2A Deployment does not render {want}")
+    # Read-only: it never dials Kafka and never publishes an event.
+    for banned in ("KAFKA_BROKERS", "EVENT_PUBLISHER", "RECOMPUTE_INTERVAL", "OUTBOX_RELAY_INTERVAL", "OUTBOX_MAX_ATTEMPTS"):
+        if banned in env:
+            failures.append(f"the A2A Deployment must not render {banned} (read-only, never dials Kafka)")
+    if any(n.endswith("_CONSUMER_GROUP") for n in env):
+        failures.append("the A2A Deployment must not render a consumer group (it runs no consumer)")
+
+
 def check_frontend(docs: list[dict], deployments: dict, services: dict, failures: list[str]) -> None:
     name = f"{RELEASE}-frontend"
     if not pins(services.get(name), "frontend"):
@@ -242,24 +270,25 @@ def main() -> int:
     failures: list[str] = []
 
     everything = render(ENABLE_EVERYTHING)
-    expected = [RELEASE, f"{RELEASE}-mcp", f"{RELEASE}-frontend"]
+    expected = [RELEASE, f"{RELEASE}-mcp", f"{RELEASE}-a2a", f"{RELEASE}-frontend"]
     check_components(everything, failures, expected)
     check_optional(everything, failures)
     deployments = {d["metadata"]["name"]: d for d in everything if d.get("kind") == "Deployment"}
     services = {d["metadata"]["name"]: d for d in everything if d.get("kind") == "Service"}
     check_mcp(deployments, services, failures)
+    check_a2a(deployments, services, failures)
     check_frontend(everything, deployments, services, failures)
 
     # Default values must not deploy an HPA, an Ingress, a route, the MCP
-    # server or the frontend.
+    # server, the A2A agent or the frontend.
     defaults = render(BASE)
     check_components(defaults, failures)
     stray = [d["kind"] for d in defaults if d.get("kind") in {"HorizontalPodAutoscaler", "Ingress", "HTTPRoute"}]
     if stray:
         failures.append(f"optional components rendered with default values: {stray}")
-    optional = [n for n in (d["metadata"]["name"] for d in defaults) if n.endswith(("-mcp", "-frontend"))]
+    optional = [n for n in (d["metadata"]["name"] for d in defaults) if n.endswith(("-mcp", "-a2a", "-frontend"))]
     if optional:
-        failures.append(f"mcp/frontend rendered with default values: {optional}")
+        failures.append(f"mcp/a2a/frontend rendered with default values: {optional}")
 
     check_refusals(failures)
 
@@ -268,9 +297,9 @@ def main() -> int:
             print(f"FAIL: {f}")
         return 1
 
-    print("PASS: every Service selects exactly one Deployment (api, mcp, frontend); mcp and frontend are off by "
-          "default and render when enabled; every env var cmd/api and cmd/mcp read is rendered, no *_MODE is, the mcp "
-          "Deployment gets no Kafka env and the frontend none at all; the chart refuses to render without a database "
+    print("PASS: every Service selects exactly one Deployment (api, mcp, a2a, frontend); mcp, a2a and frontend are "
+          "off by default and render when enabled; every env var cmd/api, cmd/mcp and cmd/a2a read is rendered, no "
+          "*_MODE is, the mcp and a2a Deployments get no Kafka env and the frontend none at all; the chart refuses to render without a database "
           "source, brokers or any of the six consumer groups, with a *_MODE in extraEnv, or with a grace period "
           "under 40s")
     return 0

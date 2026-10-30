@@ -1,9 +1,9 @@
 # Default values for node-performance.
 #
 # Two components: the api (cmd/api: REST, six Kafka consumers, the recompute
-# scheduler and the outbox relay in ONE process) and, both OFF by default,
-# the read-only MCP server (cmd/mcp, ADR 0007) and the web console remote
-# (ADR 0008). No projector or reports binary exists in this service.
+# scheduler and the outbox relay in ONE process) and, all OFF by default,
+# the read-only MCP server (cmd/mcp, ADR 0007), the read-only A2A agent
+# (cmd/a2a, ADR 0011) and the web console remote (ADR 0008). No projector or reports binary exists in this service.
 
 replicaCount: 1
 
@@ -141,6 +141,23 @@ database:
 kafka:
   brokers: ""
 
+# Observability (ADR 0010): the fleet pipeline is pod --OTLP/gRPC--> Collector
+# --> Jaeger (traces) and Prometheus (metrics); logs are stdout JSON for Alloy
+# and Loki. Export never blocks, so a Collector that is down costs telemetry and
+# nothing else, but otel.enabled=false renders no OTEL_* env at all (the binaries
+# then fall back to localhost:4317). serviceName is OTEL_SERVICE_NAME of the api;
+# the mcp component gets "<serviceName>-mcp". The frontend is static nginx and
+# exports nothing. SERVICE_VERSION is the image tag (appVersion when empty),
+# ENVIRONMENT is `environment`.
+otel:
+  enabled: true
+  endpoint: "otel-collector.observability.svc.cluster.local:4317"
+  serviceName: "node-performance"
+
+# ENVIRONMENT of the api: deployment.environment.name on every span, metric and
+# log of the api. (mcp.environment sets the same for the mcp component.)
+environment: "production"
+
 # Extra env vars appended to the api container as a raw list. The chart
 # refuses any *_MODE variable (this service has no in-memory, log or
 # permissive mode) and any variable the chart already renders (a consumer
@@ -190,9 +207,10 @@ mcp:
   enabled: false
   replicaCount: 1
   httpAddr: ":8090"                  # MCP_ADDR; its port must equal mcp.service.targetPort
-  # SERVICE_VERSION reported at boot; empty = the chart's appVersion.
+  # SERVICE_VERSION reported at boot and put on its telemetry; empty = the image
+  # tag (the chart's appVersion when that is empty too), like the api.
   serviceVersion: ""
-  # ENVIRONMENT name reported at boot.
+  # ENVIRONMENT name reported at boot and put on its telemetry.
   environment: "production"
   service:
     type: ClusterIP
@@ -203,6 +221,47 @@ mcp:
   route:
     enabled: false
     path: "/api/mcp/node-performance"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  extraEnv: []
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# cmd/a2a (ADR 0011): the read-only A2A agent (Agent2Agent JSON-RPC over HTTP on
+# / and /a2a, the Agent Card at /.well-known/agent-card.json). Same database and
+# same read use cases as the mcp component; it writes nothing: no outbox row, no
+# outbox relay, no consumer, no scheduler, no Kafka (so no kafka.brokers and no
+# consumer groups reach it). No auth, by fleet decision (the 2026-09-11 revert):
+# the in-cluster ClusterIP boundary is the access control. Default OFF.
+a2a:
+  enabled: false
+  replicaCount: 1
+  httpAddr: ":8093"                  # A2A_ADDR; its port must equal a2a.service.targetPort
+  # A2A_AGENT_URL, the absolute URL the Agent Card advertises (MANDATORY for the
+  # binary). Empty = http://<release>-a2a.<namespace>.svc.cluster.local:<service.port>/.
+  agentUrl: ""
+  # SERVICE_VERSION reported at boot, on the Agent Card and on its telemetry;
+  # empty = the image tag (the chart's appVersion when that is empty too).
+  serviceVersion: ""
+  # ENVIRONMENT name reported at boot and put on its telemetry.
+  environment: "production"
+  service:
+    type: ClusterIP
+    port: 8093
+    targetPort: 8093
+  # Gateway exposure: /api/a2a/node-performance -> Service :8093, prefix
+  # rewritten to / (the Agent Card stays reachable under the same prefix). Needs
+  # the Gateway parentRef from the infra chart.
+  route:
+    enabled: false
+    path: "/api/a2a/node-performance"
     parentRefs:
       - name: ""
         namespace: ""

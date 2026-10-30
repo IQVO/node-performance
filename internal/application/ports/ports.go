@@ -115,3 +115,18 @@ type InboundReader interface {
 	// are not returned. Nodes without data are absent from the map.
 	Observations(ctx context.Context, nodes []scorecard.NodeID, after time.Time) (map[scorecard.NodeID][]scorecard.InboundObservation, error)
 }
+
+// ScorecardMetrics records the business outcome of every scorecard the
+// Recompute command handles (Tier 2 of the fleet metrics convention). The use
+// case calls it once per scorecard it recomputed or failed to recompute;
+// scorecards that vanished or were no longer due are not attempts. The
+// implementation lives in internal/adapters/outbound/telemetry; a nil
+// Deps.Metrics records nothing.
+type ScorecardMetrics interface {
+	// ScorecardRecomputed counts a scorecard recomputed and saved.
+	ScorecardRecomputed(ctx context.Context)
+	// ScorecardRecomputeFailed counts a scorecard that was not recomputed;
+	// reason is a stable, low-cardinality slug ("concurrent-update" or
+	// "internal-error").
+	ScorecardRecomputeFailed(ctx context.Context, reason string)
+}

@@ -1,187 +1,224 @@
+---
+id: runbook
+title: Runbook
+sidebar_label: Runbook
+sidebar_position: 2
+description: "Operating Node Performance: deployment, Helm chart, probes, migrations, Kafka topics and consumer groups, outbox relay, DLQ, the recompute sweeper and routine procedures."
+---
+
 # Node Performance runbook
 
 Bounded context **Node Performance** (Supporting, partner tier) measures every node of the retail
-network against what it declared and what was asked of it — acknowledgement latency, rejections,
-on-time handover against `requiredShipBy`, promise-kept rate and inventory feed freshness — over
-rolling 7-day and 30-day windows, and grades the node (`A`–`D` from 50 observations, `PROVISIONAL`
-below). It consumes six sibling event topics, keeps two scorecards per node
-(`onTimeHandoverRate`, `lateAckRate`, `rejectRate`, `expiryRate`, `promiseKeptRate`,
-`feedFreshnessP95Minutes`), publishes `NodeScorecardUpdated` / `NodeThresholdBreached` through a
-transactional outbox and serves two read-only REST routes (`README.md`, `apis/openapi.yaml`,
-`apis/asyncapi.yaml`). This repository is a domain-driven design study; it is not associated with
-any company (`README.md` disclaimer).
+network against what it declared and what was asked of it (acknowledgement latency, rejections,
+on-time handover against `requiredShipBy`, promise-kept rate and inventory feed freshness) over
+rolling 7-day and 30-day windows, and grades the node (`A` to `D` from 50 observations,
+`PROVISIONAL` below). It consumes six sibling event topics, keeps two scorecards per node,
+publishes `NodeScorecardUpdated` and `NodeThresholdBreached` through a transactional outbox and
+serves two read-only REST routes. This repository is a domain-driven design study; it is not
+associated with any company (`README.md` disclaimer). Every variable is in
+[Configuration](/docs/operations/configuration); the symptom-driven view is
+[Troubleshooting](/docs/operations/troubleshooting).
 
 ## Runtime shape
 
-- One binary, `cmd/api`, deployed as a single `api` Deployment by `charts/node-performance/` (the
-  chart deploys nothing else: no MCP, frontend or projector — `docs/runtime.md`).
-- Inside the one process (`cmd/api/run.go`, `cmd/api/workers.go`):
-  - **REST** on `HTTP_ADDR` (default `:8080`): chi, `GET /scorecards/{nodeId}`,
-    `GET /scorecards?grade=&window=&limit=&after=`, plus the probes. Reads only, no
-    authentication, no state-changing route (`internal/adapters/inbound/http`).
-  - **Six Kafka consumers** (vendor-connectivity, shipping-and-tracking, delivery-promise,
-    offer-availability, node-topology, seller-inbound), one message at a time, offset committed only after the
-    intake use case returned (`internal/adapters/inbound/kafka/consumer.go`). No sibling REST
-    calls: facts arrive only over Kafka (`docs/adr/0003`).
-  - **Recompute scheduler**: runs `Recompute` once at boot, then every `RECOMPUTE_INTERVAL`
-    (default 1m). Each round loads the scorecards that are due (an observation recorded since the
-    last recompute, or one that left the window), recomputes them and appends the events to the
-    outbox in the SAME Postgres transaction (`cmd/api/workers.go` `runRecompute`,
-    `internal/application/usecases/recompute.go`). A failed round is logged at ERROR and retried
-    at the next tick; a scorecard under 50 observations stays `PROVISIONAL` and publishes nothing.
-  - **Outbox relay**: always on, polls every `OUTBOX_RELAY_INTERVAL` (default 1s), publishes
-    unpublished `outbox_events` rows in id order to `retailnetwork.node-performance.events` and
-    `retailnetwork.node-performance.analytics` (`internal/adapters/outbound/outbox`,
-    `internal/adapters/outbound/kafka`).
+Three binaries, one chart (`charts/node-performance/`), three independent Deployments:
+
+| Binary | Role | Port | Chart switch | Kong route (kind cluster) |
+| --- | --- | --- | --- | --- |
+| `cmd/api` | REST, six consumers, recompute scheduler, outbox relay (ONE process) | 8080 (Service 80) | always on | `/api/node-performance` (prefix stripped) |
+| `cmd/mcp` | read-only MCP, Streamable HTTP on `/mcp` and `/` | 8090 | `mcp.enabled` (off by default) | `/api/mcp/node-performance` (rewritten to `/mcp`) |
+| `cmd/a2a` | read-only A2A agent, JSON-RPC on `/` and `/a2a`, Agent Card at `/.well-known/agent-card.json` | 8093 | `a2a.enabled` (off by default) | `/api/a2a/node-performance` (rewritten to `/`) |
+
+warehouse-infra (`helm-values/node-performance.yaml` on develop) switches `mcp`, `a2a` and the
+`frontend` (the `node_performance_mfe` console remote) on, with their routes. `cmd/mcp` and
+`cmd/a2a` read the same Postgres through the same two read use cases; they never start a worker,
+never dial Kafka and cannot write.
+
+Inside the `api` process (`cmd/api/run.go`, `cmd/api/workers.go`):
+
+- **REST** on `HTTP_ADDR` (default `:8080`): chi, `GET /scorecards/{nodeId}`,
+  `GET /scorecards?grade=&window=&limit=&after=`, plus the probes. Reads only, no
+  authentication, no state-changing route (`internal/adapters/inbound/http`).
+- **Six Kafka consumers** (vendor-connectivity, shipping-and-tracking, delivery-promise,
+  offer-availability, node-topology, seller-inbound), one message at a time, offset committed
+  only after the intake use case returned (`internal/adapters/inbound/kafka/consumer.go`). No
+  sibling REST calls: facts arrive only over Kafka ([ADR 0003](/docs/adr/0003-consumed-contracts-and-local-facts)).
+- **Recompute scheduler** (the sweeper): runs `Recompute` once at boot, then every
+  `RECOMPUTE_INTERVAL` (default 1m). Each round loads up to 200 due scorecards, up to 10 rounds per
+  run, recomputes them and appends the events to the outbox in the SAME Postgres transaction
+  (`cmd/api/workers.go` `runRecompute`, `internal/application/usecases/recompute.go`). A failed
+  round is logged at ERROR and retried at the next tick.
+- **Outbox relay**: always on, polls every `OUTBOX_RELAY_INTERVAL` (default 1s), publishes
+  unpublished `outbox_events` rows in id order (`internal/adapters/outbound/outbox`,
+  `internal/adapters/outbound/kafka`).
 - Any worker that returns on its own makes the process run the shutdown sequence and exit
-  non-zero, so the orchestrator restarts it (`cmd/api/run.go`, `cmd/api/workers.go`).
+  non-zero, so the orchestrator restarts it (`worker stopped` in the log).
 - Graceful shutdown (SIGINT/SIGTERM): `/readyz` flips to 503, wait `SHUTDOWN_DRAIN_DELAY` (5s),
-  drain HTTP (10s), stop consumers and scheduler (10s), stop the relay LAST (10s), close the pool
-  — 35s of bounds, chart `terminationGracePeriodSeconds: 40` (`docs/runtime.md`).
+  drain HTTP (10s), stop consumers and scheduler (10s), stop the relay LAST (10s), close the pool:
+  35s of bounds, chart `terminationGracePeriodSeconds: 40` ([Runtime](/docs/overview/runtime)).
 
 ## Dependencies
 
-- **Postgres** — `DATABASE_URL` is the service's pool (reached through PgBouncer on the cluster);
+- **Postgres**: `DATABASE_URL` is the service's pool (through PgBouncer on the cluster);
   `MIGRATIONS_DATABASE_URL` is a direct DSN for the boot migrations, because golang-migrate holds
   a session advisory lock that breaks behind a transaction-pooling proxy (optional key; the
   binary falls back to `DATABASE_URL`). Both DSNs reach the pod from the Secret
-  `node-performance-db` via `secretKeyRef` (`charts/node-performance/templates/deployment.yaml`,
-  `internal/adapters/outbound/postgres/config.go`). Embedded migrations:
-  `internal/adapters/outbound/postgres/migrations/`.
-- **Kafka** — `KAFKA_BROKERS`, comma-separated `host:port`, used by the consumers, the relay and
+  `node-performance-db` via `secretKeyRef`.
+- **Kafka**: `KAFKA_BROKERS` (one broker platform-wide), used by the consumers, the relay and
   the `/readyz` broker check. Topics are auto-created by the first writer; `/readyz` never asks
-  for topics. Consumed: `retailnetwork.vendor-connectivity.events`,
-  `retailnetwork.shipping-and-tracking.events`, `retailnetwork.delivery-promise.events`,
-  `retailnetwork.offer-availability.events`, `retailnetwork.node-topology.events`.
-- Boot is resilient: migrations and the Postgres ping retry 5 times (1+2+4+8s backoff,
-  `internal/bootretry`); consumers and the relay dial lazily, so a broker down at boot never
-  blocks start (`docs/runtime.md`).
+  for topics.
+- Boot is resilient to a slow start: migrations and the Postgres ping retry 5 times (1+2+4+8s
+  backoff, `internal/bootretry`); consumers and the relay dial lazily, so a broker that is down at
+  boot does not block `listen`. A consumer is less patient than the relay, though: a *refused*
+  connection is fatal to its worker (only timeouts, resets and EOFs are retried, up to 10
+  consecutive fetches, `internal/adapters/inbound/kafka/kafka.go`). In a real run against a
+  closed port the consumers logged `worker stopped ... failed to dial` about 10 s after boot and
+  the process exited non-zero, to be restarted by the orchestrator. See
+  [Troubleshooting](/docs/operations/troubleshooting#pod-restarts-worker-stopped).
+
+## Migrations
+
+Embedded in the binary (`internal/adapters/outbound/postgres/migrations/`, golang-migrate) and run
+at every start of `cmd/api`, `cmd/mcp` and `cmd/a2a`; the advisory lock makes concurrent starts
+safe. There is no separate migration job.
+
+| Migration | Creates |
+| --- | --- |
+| `0001_node_performance_schema` | `scorecards`, `scorecard_observations`, `purchase_order_facts` |
+| `0002_outbox_inbox_and_idempotency` | `outbox_events`, `processed_events` (the inbox), `idempotency_keys` (no route uses it) |
+| `0003_inbound_read_models` | `inbound_shipments`, `inbound_receipts` ([ADR 0009](/docs/adr/0009-inbound-timeliness-and-accuracy-metrics)) |
+
+Check the state with `SELECT version, dirty FROM schema_migrations;`. A `dirty = true` row means a
+migration died half-way: fix the cause, then `migrate force` the version by hand; the service
+refuses to boot on a dirty database.
+
+## Kafka topics and consumer groups
+
+| Direction | Topic | Group variable | Platform group id (warehouse-infra) |
+| --- | --- | --- | --- |
+| consumed | `retailnetwork.vendor-connectivity.events` | `VENDOR_CONNECTIVITY_CONSUMER_GROUP` | `node-performance-vendor-connectivity` |
+| consumed | `retailnetwork.shipping-and-tracking.events` | `SHIPPING_AND_TRACKING_CONSUMER_GROUP` | `node-performance-shipping-and-tracking` |
+| consumed | `retailnetwork.delivery-promise.events` | `DELIVERY_PROMISE_CONSUMER_GROUP` | `node-performance-delivery-promise` |
+| consumed | `retailnetwork.offer-availability.events` | `OFFER_AVAILABILITY_CONSUMER_GROUP` | `node-performance-offer-availability` |
+| consumed | `retailnetwork.node-topology.events` | `NODE_TOPOLOGY_CONSUMER_GROUP` | `node-performance-node-topology` |
+| consumed | `retailnetwork.seller-inbound.events` | `SELLER_INBOUND_CONSUMER_GROUP` | `node-performance-seller-inbound` |
+| published | `retailnetwork.node-performance.events` | none | `NodeScorecardUpdated` only |
+| published | `retailnetwork.node-performance.analytics` | none | `NodeThresholdBreached` only |
+| dead letters | `<consumed topic>.dlq` | none | written by the consumers |
+
+Group ids are fixed and stable (never the pod name): a rescheduled pod resumes from its committed
+offsets, while a brand-new group id re-reads its topic from the first offset. Never change a group
+id on a running deployment unless a full replay is wanted; replays are safe because every message is
+deduplicated on the CloudEvents `id` in `processed_events`.
 
 ## Health
 
-- `GET /healthz` — liveness: 200 `{"status":"ok"}` while the process serves, even while draining
-  or while a dependency is down (`internal/adapters/inbound/http/readiness.go`).
-- `GET /readyz` — 200 `{"status":"ready"}` only when the drain gate is open, Postgres answers a
-  ping AND a Kafka broker answers a metadata request with an empty, non-nil topic list (fresh
-  connection per check, verdicts cached 3s). Draining: 503 `{"status":"not_ready"}`. A dependency
-  down: 503 `application/problem+json` of type `dependency-unavailable` naming postgres or kafka
-  (`internal/adapters/inbound/http/problems.go`).
+- `GET /healthz`: liveness, 200 `{"status":"ok"}` while the process serves, even while draining
+  or while a dependency is down (`internal/adapters/inbound/http/readiness.go`). `cmd/mcp` and
+  `cmd/a2a` serve only this probe.
+- `GET /readyz` (`cmd/api` only): 200 `{"status":"ready"}` only when the drain gate is open,
+  Postgres answers a ping AND a Kafka broker answers a metadata request with an empty, non-nil
+  topic list (fresh connection per check, verdicts cached 3s, round bounded 2s). Draining: 503
+  `{"status":"not_ready"}`. A dependency down: 503 `application/problem+json` of type
+  `dependency-unavailable` naming postgres or kafka (`internal/adapters/inbound/http/problems.go`).
 - Chart probes: startup and liveness on `/healthz`, readiness on `/readyz`
   (`charts/node-performance/values.yaml`).
-- Writes while a dependency is down: the REST surface is read-only, so the only writers are the
-  consumers' intake and the recompute. With **Kafka** down both keep working — effects and outbox
-  rows commit in one Postgres transaction and `outbox_events.published_at IS NULL` rows queue
-  until the broker returns (`docs/adr/0005`, asserted by `cmd/api/e2e_integration_test.go`).
-  With **Postgres** down nothing persists: REST reads fail, `/readyz` flips, consumers cannot
-  claim `processed_events`, recompute rounds log ERROR and retry.
+- With **Kafka** down both writers keep working: effects and outbox rows commit in one Postgres
+  transaction and `outbox_events.published_at IS NULL` rows queue until the broker returns
+  ([ADR 0005](/docs/adr/0005-outbox-relay-and-attempt-cap), asserted by
+  `cmd/api/e2e_integration_test.go`). With **Postgres** down nothing persists: REST reads fail,
+  `/readyz` flips, consumers cannot claim `processed_events`, recompute rounds log ERROR and retry.
 
-## Configuration
+## Outbox relay
 
-Every variable `cmd/api` reads (`cmd/api/config.go`; a missing mandatory one is a boot error
-naming it; each `config.*` chart value maps 1:1 to one variable, `charts/node-performance/values.yaml`;
-the ConfigMap carries all of them except the two DSNs):
+- Events are written in the same transaction as the aggregates and published later; delivery is
+  at-least-once with a stable CloudEvents `id`; consumers deduplicate.
+- A row that failed `OUTBOX_MAX_ATTEMPTS` times (20) is skipped (logged once at ERROR with id,
+  topic, type and key) and stays in the table with `attempts` and `last_error`; later events of the
+  same scorecard can overtake it. Inspect and re-arm:
 
-| Env var | Default | Chart value | Meaning |
-| --- | --- | --- | --- |
-| `DATABASE_URL` | required | `database.url` / `database.existingSecret` (key `DATABASE_URL`) | pooled Postgres DSN |
-| `MIGRATIONS_DATABASE_URL` | `DATABASE_URL` | `database.migrationsExistingSecretKey` | direct DSN for the boot migrations |
-| `KAFKA_BROKERS` | required | `kafka.brokers` | comma-separated `host:port` list |
-| `VENDOR_CONNECTIVITY_CONSUMER_GROUP` | required | `config.vendorConnectivityConsumerGroup` | group id for the vendor-connectivity topic |
-| `SHIPPING_AND_TRACKING_CONSUMER_GROUP` | required | `config.shippingAndTrackingConsumerGroup` | group id for the shipping-and-tracking topic |
-| `DELIVERY_PROMISE_CONSUMER_GROUP` | required | `config.deliveryPromiseConsumerGroup` | group id for the delivery-promise topic |
-| `OFFER_AVAILABILITY_CONSUMER_GROUP` | required | `config.offerAvailabilityConsumerGroup` | group id for the offer-availability topic |
-| `NODE_TOPOLOGY_CONSUMER_GROUP` | required | `config.nodeTopologyConsumerGroup` | group id for the node-topology topic |
-| `SELLER_INBOUND_CONSUMER_GROUP` | required | `config.sellerInboundConsumerGroup` | group id for the seller-inbound topic |
-| `HTTP_ADDR` | `:8080` | `config.httpAddr` | listen address; port must equal `service.targetPort` |
-| `RECOMPUTE_INTERVAL` | `1m` | `config.recomputeInterval` | recompute scheduler tick (Go duration or plain seconds) |
-| `OUTBOX_RELAY_INTERVAL` | `1s` | `config.outboxRelayInterval` | relay poll interval |
-| `OUTBOX_MAX_ATTEMPTS` | `20` | `config.outboxMaxAttempts` | failures before the relay excludes a row; `0` = unlimited |
-| `SHUTDOWN_DRAIN_DELAY` | `5s` | `config.shutdownDrainDelay` | wait after flipping `/readyz`; `0` disables |
-| `LOG_LEVEL` | `info` | `config.logLevel` | `debug`/`info`/`warn`/`error` |
+  ```sql
+  SELECT id, event_id, topic, event_type, attempts, last_error, created_at
+    FROM outbox_events WHERE published_at IS NULL AND attempts >= 20 ORDER BY id;
+  UPDATE outbox_events SET attempts = 0 WHERE id = <id>;
+  ```
 
-The chart refuses to render without the DSN source, `kafka.brokers` and the six group ids, and
-refuses a `terminationGracePeriodSeconds` below `config.shutdownDrainDelay` + 35s
-(`charts/node-performance/templates/_helpers.tpl`).
+  Table defined in `internal/adapters/outbound/postgres/migrations/0002_outbox_inbox_and_idempotency.up.sql`.
+- Queue depth: `SELECT count(*) FROM outbox_events WHERE published_at IS NULL;`
+
+## Dead-letter queues
+
+A transient failure (database down, purchase-order facts not arrived yet) is retried up to 5
+attempts (`maxHandlerAttempts`, `internal/adapters/inbound/kafka/deadletter.go`) with backoff 200ms
+doubling to 5s, then published to `<topic>.dlq`; a payload that can never be applied is dead-lettered
+at once. The DLQ message keeps the original key, value and headers and adds `x-dlq-source-topic`,
+`x-dlq-source-partition`, `x-dlq-source-offset`, `x-dlq-error` and `x-dlq-failed-at`. A message that
+is not a CloudEvents 1.0 event, or of an unhandled type, is skipped, not dead-lettered. Nothing in
+this repository reads a DLQ back: read `x-dlq-error`, fix the producer or dependency, and
+republish the payload to the source topic by hand if it is still wanted.
+
+## Deployment (Helm)
+
+`charts/node-performance/` deploys the `api` by default; `mcp`, `a2a` and `frontend` are opt-in
+(`values.yaml` documents every key; each `config.*` value maps 1:1 to one variable, and the chart
+ConfigMap, mounted with `envFrom` with a `checksum/config` pod annotation, carries every one of them
+except the two DSNs).
+
+- Required, refused at render with the value named: `database.url` or `database.existingSecret`
+  (`DATABASE_URL` from a `secretKeyRef`; `MIGRATIONS_DATABASE_URL` from
+  `database.migrationsExistingSecretKey` with `optional: true`), `kafka.brokers`, and the six
+  `config.*ConsumerGroup` values (`vendorConnectivity`, `shippingAndTracking`, `deliveryPromise`,
+  `offerAvailability`, `nodeTopology`, `sellerInbound`).
+- Observability ([ADR 0010](/docs/adr/0010-fleet-observability-standard)): `otel.enabled`,
+  `otel.endpoint`, `otel.serviceName` render `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME`
+  (`<name>-mcp` for mcp, `<name>-a2a` for a2a); `SERVICE_VERSION` is `image.tag` or the appVersion,
+  `ENVIRONMENT` is `environment`. `extraEnv` may not set any of the four.
+- Also refused: a group id that is an env expansion (`$(POD_NAME)`), any `*_MODE` or chart-managed
+  variable in `extraEnv`, a `config.httpAddr` port that is not `service.targetPort`, and a
+  `terminationGracePeriodSeconds` below `config.shutdownDrainDelay` + 35 s (40 s with the default).
+- `a2a.agentUrl` empty renders `http://<release>-a2a.<namespace>.svc.cluster.local:<service.port>/`
+  as `A2A_AGENT_URL`.
+- Pod: uid 1000, `runAsNonRoot`, read-only root filesystem, no privilege escalation, all
+  capabilities dropped, seccomp `RuntimeDefault`.
+- HPA, Ingress and Gateway API HTTPRoute are off by default. More than one `api` replica is safe by
+  design (the relay claims with `FOR UPDATE SKIP LOCKED`, consumers share one group per topic) but
+  has not been load-tested.
+- Tests: `bash charts/node-performance/tests/render_test.sh` and
+  `python3 charts/node-performance/tests/test_service_selectors.py`, both run by the `chart-tests`
+  CI job; `helm-lint` (pull requests) runs `ct lint` and the selector test. The `release` job
+  packages `node-performance-<version>.tgz`; the image is `ghcr.io/iqvo/node-performance`
+  ([Before first release](/docs/operations/before-first-release)).
 
 ## Alerts and dashboards
 
-- Traffic enters through the Kong route `/api/node-performance` (prefix stripped) on the local
-  kind cluster; it fronts the chart's Service.
-- Grafana dashboard uid **`warehouse-node-performance`**; pod-restart alerts for the Deployment
-  exist (both managed in warehouse-infra, not this repo).
-- No business metrics are instrumented yet, so business-metric panels on the dashboard stay empty
-  until the service instruments itself: an empty panel is not an outage signal. Verify health via
-  `/healthz`, `/readyz` and logs instead. This runbook deliberately states no SLOs.
+Managed in warehouse-infra (`develop`), not in this repository:
 
-## Failure modes
-
-### Pod crash-loop
-- Symptom: `CrashLoopBackOff`, restarts climbing, pod-restart alert fires.
-- Diagnosis: `kubectl -n warehouse-systems logs deploy/node-performance --previous`. A boot error
-  names the missing variable (raised before anything is opened — `cmd/api/config.go`); a
-  past-boot exit has `worker stopped` naming the loop that returned (the non-zero exit is by
-  design). Boot tolerates ~15s of Postgres downtime (5 retries) inside the ~60s startup probe.
-- Action: fix the named env/Secret/chart value or its dependency, then
-  `kubectl -n warehouse-systems rollout restart deploy/node-performance`.
-
-### Postgres unreachable
-- Symptom: `/readyz` 503 `dependency-unavailable` naming postgres; the pod leaves Service
-  endpoints; REST reads fail; consumer handler retries in the logs.
-- Diagnosis: `kubectl -n warehouse-systems exec deploy/node-performance -- wget -qO- http://localhost:8080/readyz`
-  (from another pod if restarting); check Postgres and PgBouncer.
-- Action: restore the dependency; recovery is automatic (verdicts cached 3s). No data loss:
-  offsets commit only after the intake returned, and the CloudEvents id is claimed in
-  `processed_events` in the same transaction as the effect, so a redelivery changes nothing.
-
-### Kafka unreachable
-- Symptom: `/readyz` 503 naming kafka while `/healthz` stays 200 and REST reads stay 200 (they
-  only touch Postgres); relay ERROR logs; the unpublished outbox tail grows.
-- Diagnosis: `SELECT count(*) FROM outbox_events WHERE published_at IS NULL;`
-- Action: restore the broker; no operator action otherwise. Writes (scorecard recompute +
-  outbox rows, one transaction) keep being accepted and are published in id order once the broker
-  is back (`docs/adr/0005`).
-
-### Outbox relay stuck / a row parked after max attempts
-- Symptom: one ERROR log naming `outbox row <id> (<type>)` with id, topic, type and key; that row
-  stays unpublished and later events of the same scorecard can overtake it.
-- Diagnosis: the relay stops claiming rows whose `attempts` reached `OUTBOX_MAX_ATTEMPTS` (20 by
-  default) — `internal/adapters/outbound/postgres/relay_store.go`. Inspect:
-  `SELECT id, event_id, topic, event_type, attempts, last_error, created_at FROM outbox_events WHERE published_at IS NULL AND attempts >= 20 ORDER BY id;`
-  (table defined in `internal/adapters/outbound/postgres/migrations/0002_outbox_inbox_and_idempotency.up.sql`).
-- Action: read `last_error`, fix the cause (usually the broker), then re-arm the row:
-  `UPDATE outbox_events SET attempts = 0 WHERE id = <id>;` — the next relay pass claims it again.
-
-### Consumer lag or retry logs
-- Symptom: repeated `handling failed ... retrying` logs on one consumer; lag grows; eventually
-  `handling failed after the maximum attempts; dead-lettering the message`.
-- Diagnosis: a transient failure (database down, purchase-order facts not arrived yet) is retried
-  up to 5 attempts (`maxHandlerAttempts`, `internal/adapters/inbound/kafka/deadletter.go`) with
-  backoff 200ms doubling to 5s (`internal/adapters/inbound/kafka/kafka.go`), then published to
-  `<topic>.dlq` with `x-dlq-source-topic/-partition/-offset`, `x-dlq-error` and `x-dlq-failed-at`
-  headers; a payload that can never be applied is dead-lettered at once. A consumed topic whose
-  producer has not written yet only shows fetch retries — topics are auto-created by the first
-  writer, so this is normal for a not-yet-integrated sibling, not a fault.
-- Action: read `x-dlq-error` on the DLQ topic, fix the producer or dependency, redeliver manually
-  if needed. Non-CloudEvents or unhandled-type messages are skipped by design.
-
-### Recompute sweep not updating KPIs
-- Symptom: scorecards stale in REST reads; no `NodeScorecardUpdated` events.
-- Diagnosis: a `recompute round failed` ERROR (with recomputed/events counts) means every round
-  throws and retries next tick — usually Postgres. Otherwise check the due-condition: only
-  scorecards with an observation recorded since the last recompute (or one that left the window)
-  are recomputed, and below 50 observations a scorecard is `PROVISIONAL` and publishes nothing.
-- Action: fix the logged cause; the next tick logs `recompute round` with `recomputed > 0`. If
-  events are appended but not published, the relay is the problem (see above).
+- Grafana dashboard uid **`warehouse-node-performance`** (`terraform/dashboards/contexts/node-performance.json`):
+  Kong request rate, 5xx ratio and p95 latency for the context's routes; service HTTP RED by
+  `service_name=~"node-performance.*"`; the business counter
+  `nodeperformance_scorecards_recomputed_total` by `outcome`; Go runtime; Loki panels on
+  `{app="node-performance"}`.
+- Alert group `warehouse-node-performance` (`terraform/alerting/warehouse-alert-rules.json`):
+  `WarehouseKong5xxRatioHigh` (more than 5% 5xx on a Kong route for 5m, warning) and
+  `WarehousePodRestarting` (2 or more restarts of a `node-performance-.+` pod in 15m, warning).
+- Alert group `warehouse-node-performance-slo`: `WarehouseApiAvailabilityBurnFast` and
+  `WarehouseApiLatencyBurnFast` (critical, 2m), `WarehouseApiAvailabilityBurnSlow` and
+  `WarehouseApiLatencyBurnSlow` (warning, 15m) over the Kong routes (latency objective: upstream
+  under 400 ms).
+- There is no alert on the recompute counter, the outbox backlog or consumer lag. Watch
+  `outcome="failed"` and the unpublished-outbox query above by hand; a flat `recomputed` rate while
+  nodes keep reporting means grading has stalled. See [Observability](/docs/operations/observability).
 
 ## Operational actions
 
-- Restart: `kubectl -n warehouse-systems rollout restart deploy/node-performance`
-  (Deployment name is the chart fullname `<release>-node-performance`).
-- Logs: Grafana Loki, `app=node-performance`; the binary emits JSON logs on stdout
-  (`cmd/api/run.go`). Worker lifecycle lines to grep: `worker running`, `worker stopped`,
-  `recompute round`, `consumer configured`, `outbox relay configured`.
-- Rollback: redeploy the previous `image.tag` chart value.
-- Scale: more than one replica is safe by design (the relay claims rows with
-  `FOR UPDATE SKIP LOCKED`, consumers share one stable group per topic, aggregate writes are
-  version-guarded) but has not been load-tested; the HPA is off by default
-  (`charts/node-performance/values.yaml`).
+- Restart: `kubectl -n warehouse-systems rollout restart deploy/node-performance` (the Deployment name
+  is the chart fullname `<release>-node-performance`; `-mcp` and `-a2a` for the others).
+- Logs: Grafana Loki, `app=node-performance`; the binaries emit JSON logs on stdout. Worker
+  lifecycle lines to grep: `worker running`, `worker stopped`, `recompute round`,
+  `consumer configured`, `outbox relay configured`.
+- Rollback: redeploy the previous `image.tag` chart value (migrations only add tables; there is no
+  down-migration step in the deploy path).
+- Scale: see the Helm section; the HPA is off by default.
+- Force a recompute: restart the `api` (the scheduler runs once at boot).
+- Replay a consumed topic: give the consumer a new group id in the chart (a new group starts at the
+  first offset); all effects are idempotent on the CloudEvents `id`.

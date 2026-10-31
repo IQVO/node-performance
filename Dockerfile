@@ -40,10 +40,11 @@ WORKDIR /app
 # filesystem read-only. Logs go to stdout.
 COPY --from=build --chown=app:app /out/ ./
 USER 1000
-# 8080 api (REST), 8090 mcp (Streamable HTTP; ADR 0007).
-EXPOSE 8080 8090
+# 8080 api (REST), 8090 mcp (Streamable HTTP; ADR 0007), 8093 a2a (JSON-RPC; ADR 0011).
+EXPOSE 8080 8090 8093
 # cmd/api is the service's main binary (HTTP on :8080). Additional cmd/*
 # binaries are run by the chart with `command: ["/app/<dirname>"]`; cmd/mcp is
-# the read-only MCP server on :8090. The web remote has its own image
+# the read-only MCP server on :8090 and cmd/a2a the read-only A2A agent on :8093
+# (it needs A2A_AGENT_URL). The web remote has its own image
 # (web/Dockerfile).
 ENTRYPOINT ["./api"]

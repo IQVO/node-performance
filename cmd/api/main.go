@@ -20,6 +20,10 @@
 //	OUTBOX_MAX_ATTEMPTS                failures before the relay excludes a row (default 20, 0 = unlimited)
 //	SHUTDOWN_DRAIN_DELAY               wait after flipping /readyz before closing (default 5s)
 //	LOG_LEVEL                          debug|info|warn|error (default info)
+//	OTEL_SERVICE_NAME                  service.name of spans and metrics (default node-performance)
+//	OTEL_EXPORTER_OTLP_ENDPOINT        Collector OTLP/gRPC endpoint (default telemetry.DefaultEndpoint); export never blocks
+//	SERVICE_VERSION                    service.version (default dev)
+//	ENVIRONMENT                        deployment.environment.name (default local)
 //
 // GET /readyz is 200 only while Postgres answers a ping AND a Kafka broker
 // answers a metadata request; /healthz is liveness only. The process exits

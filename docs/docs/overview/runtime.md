@@ -1,8 +1,18 @@
+---
+id: runtime
+title: Runtime
+sidebar_label: Runtime
+sidebar_position: 3
+description: "How cmd/api boots, serves, runs its workers and shuts down: environment, probes, consumers, the recompute scheduler, the outbox and the Helm chart."
+---
+
 # Runtime: configuration, probes, shutdown, workers and the outbox
 
-`cmd/api` is the only binary. It runs on real PostgreSQL and real Kafka; there is no
-alternative runtime and no log sink. Next to the REST API it runs six Kafka
-consumers, a recompute scheduler and the outbox relay.
+`cmd/api` is the binary that runs the context: it runs on real PostgreSQL and real Kafka; there
+is no alternative runtime and no log sink. Next to the REST API it runs six Kafka consumers, a
+recompute scheduler and the outbox relay. `cmd/mcp` and `cmd/a2a` are separate, read-only
+processes over the same database (see [Architecture](/docs/overview/architecture)); every
+variable of all three is in [Configuration](/docs/operations/configuration).
 
 ## Environment
 
@@ -35,7 +45,10 @@ never derived from the pod name: it is a chart value.
 1. Validate the environment. 2. Run the embedded migrations and ping Postgres, both with
 exponential backoff (5 attempts, 1 + 2 + 4 + 8 s). 3. Start the six consumers, the
 recompute scheduler and the outbox relay (none dials at construction; a broker that is
-down only makes fetches and passes fail until it is back). 4. Serve.
+down at boot does not block `listen`, but a consumer treats a *refused* connection as fatal:
+only timeouts, resets and EOFs are retried, up to 10 consecutive fetches, after which the worker
+stops and the process exits non-zero for the orchestrator to restart; the relay only fails its passes
+until the broker is back). 4. Serve.
 
 On SIGINT/SIGTERM: `/readyz` flips to 503 `not_ready`, wait `SHUTDOWN_DRAIN_DELAY`, drain
 HTTP (10 s), stop and await the consumers and the scheduler (10 s), stop and await the
@@ -85,7 +98,8 @@ must exceed it.
 
 ## Deployment (Helm)
 
-`charts/node-performance/` deploys the `api` and nothing else by default (no MCP, A2A, frontend, projector or reports; mcp, a2a and frontend are opt-in).
+`charts/node-performance/` deploys the `api` by default (`mcp`, `a2a` and `frontend` are opt-in
+components, off by default; warehouse-infra switches them on).
 `values.yaml` documents every key; each `config.*` value maps 1:1 to one variable of the table above, and the
 chart ConfigMap (mounted with `envFrom`, with a `checksum/config` pod annotation) carries every one of them except the two
 DSNs.

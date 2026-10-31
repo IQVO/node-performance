@@ -1,0 +1,70 @@
+---
+id: list-scorecards-by-grade
+title: "List the scorecards whose current grade matches (ListScorecardsByGrade)"
+description: "Lists every scorecard whose current grade is the one given, ordered by scorecardId ascending, one page at a time. The model names no window filter and no caller; the optional window filter and the keyset pagination (limit, after) are additive (ADR 0002, A18)."
+sidebar_label: "List the scorecards whose current grade matches (ListScorecardsByGrade)"
+hide_title: true
+hide_table_of_contents: true
+api: eJztWd9v2zgS/lcGBA61UdlW0gRtnSc3yWaDzTa5JNt9KAosLY4tNhKpJSkn3sD/+2FISVZsJU3a4nAP99LUEjnzcebj/NI9c3xu2fgzu0q0wYQbYdmXiOkCDXdSq1PBxiyT1q3ff1ieGC6QRUygTYwsaB0bszNpnQVcoFmCrVfDbaotQlIag8rBnHaCtOBSBK0Q5nKBKgJtBBoUMG1tPRXAbYJKSDWP/OKCzxG4Aw5O5jiE6xQh1wIzUDxHC0rDrVRC38JMZg4NcCXoYcKzDM1BUOrh8qxjJb2+waVFR5qk8gaAXiZz6SLgM4emD9wgcCGkkwuE3uToEuI43o1gsvOuP2QRK7jhOTo0ZNV7RsDYmM0ri0ky1N8lmiWLmMG/S2lQsLEzJW6acxLBhwgOIzgi88DF5fmn06vT84+TM5hipm/DaaYWzSIAzaWSeZkTCJukmHM2vmduWZB+64xU8y2XVTpI/tHBy1SgKnPizYRF7AOL2CGL2BGLWEsIEclJlxEAT5lPPCuRrVZRY5fghMcNM+OZ3bLMJdJxEufhETfBac+PIO0lBiAGGZ1lUs2r3RG8JXO8iUHwpW2f9K1gEXsTi/ax/gz420fydHnhiS6I2Fb+gxHs0GH24/gAduIYblNUwKcWles8llQO52hYxCrXsPFOxHJ+F/6/H8ekasbLzLHxThy3gXpCvxAo2UvhnTssjdUG9Mz7oDC4kLq04YL2vFu4dQ+uskFXGoWi/7R7cn53hmruUjZ+F69WXwiRLbSyaGn5bhzTn21QOXdJSl5sdHrfJVo5VI728KLIZOJ5PPpqaeP9Ng49/YqJe2CHz0w6zH1ULAzFRScDlvB4vZcbw8mEm887ZbZMwyKmtED/n+Y+WMcdBYw6cORIlO9A0Rb0TboHPfAaXo1fwevWfcE7nhee0R8Hcby3OyaerxpgHYI3d9DqCv1/7dbVZuqCV21vh6OInVxOjo6P2qKatHblJa1qi/+Phs41ETr41XErwuL6nlYpr5219geTnbg/hEm1tsrXApXOKQNqQ9ka88ItwWChjbMgnYUpWgcLAjXcYLZW1zLHX7kSeoHmMtA44w4nyU31yyAhrn7gXSHNsvpRGJ1Li79hUb+eIYpfDNpUobUX7/d/l6p0aFnEWtbtuBcdMNYmU2U+fRg141bU3NkOz8kNn6OFlCuBAkgiaEW+n+JMG4TaAFepLD4so7Ci6Ng2hF/lPEVv1Sk6h2ZIXm3b5/thliZJucVQTVngyY3StxmKOQqQCpq4vBP/q6KENLSqJoY24L2Boj7BUxLXq4dwpm+3ztTy8k87UpBZu+CH4LV499PgVQp/ArrNi/D9EIMgCzdYuArYg0dFRom7fjQ1+gYV1eEcKPgPuHNGTkvHpxlCwkuLj1D4sYv6ZLESb8J9v+9SKNAkqJzMEHoKuaFYY7i66TeBLNUZUkglDQTiFlFBQmVCUvrK3Gd7T/sFKqfNEghfEwnpaN2GfxBVXob9vLUVEl0qt753dapdUb011aUSFJ4y+UPGOlUzbXIeGpoIFPVeocUSTZB/3x/CjxiVg01lkaNyryycBuhX1RP6W6AY2vB34po2ymCCcuEf6ZlPGNXWS3pRuKtymkvnmkDT7CmcbTaDVFYKbNnvAHi9DKzjeUEtY4jApKNGGoxvgVuIh3AeNIVaWulGwFctFQoqtx/snfEssxtu62RK5cdJkpSGJz8YSZ7rykNuHNEr5GIUcHl8eHz66fgo2JFnGSSbS6bL59oXemujhOxQm6W/YcfWnlRnwvfetkzSSntnjFita5rfqypmRSV6XpSOqNJVdAWrsDET3OGA2v6tQufPGo/PbQYrgUTuA9AV6IoltGwmjXXULz6E1FSC/um6yXleOfuX76b+CiVRE2Xwzo8ScI1Dt6DSm0cw0CyFrVb0bm93d7vlWfBMCs+WwYzLjEhybMyn5ml/HMgTtVK7b0zJIUrTRQWeJFgQpqaMe6RbKoyeZpi//nbXtNGn/3II7/f230IlAAQ6LjO7WTF6KbURQk1fdlR0Qdm3nHFR6aJVYLNyHtF5BzO6qmSFLcs9bH+atWztlk2VqwZjV7huZO3FeytCR2fuFCKVdVwlXRpanKgOFEqWSnSzfus0bL1xzQZo3tW493Z319BCywN5aR1Mw1hOz6A9f2p1JkNPy9CIpJqmg3N0fu5FPTsbrftvUodmUU/CSkOqUueK8WiU6YRnqbZu/C5+FzPq86WaaX+yCv5HLRAu0PgIoBKEycUpixjJC56OhzvDuGItTzxrq8mGL1yK1tacS+W4VIQlaiGx49FoLl1aToeJzken//50PtrczFZbvD6+uqZiwxmeuHZF8UCnTw4o/EKKA9U6440OCt2tNjcRCDQ+Fs+MzquXg+rlQOjEhgHnyP87XPI8g14l0X7e1PllSFk9giGfzw3OuUMbkX4qgagoGaIx2ti+T9NcfC1tKz0kRls7qNEKTKT1hUzvZDeO4OTNmwiOacYJW47x9Kknv4QpHCZUUnQ0njgLWmVL6G0WxdLakqqAOhhF6xKfQDbtSFcvBXzO6Q5tdV8PC1zq0nxVG21Vg1WV2K/EwduB4MtgHXgT+x91BTBpzbSf7PChtx/3Kcy2Lw180C4Fo31pxX3DyMWATBKB1aDozjl+Qy8VnArMC+1QJcvBb7gcwgKV0IZ8ozBxciHd0s+0LZwcX0Pryo3uw8BmBVINtJlzJf8J4JwG7w3glbRXtnUgQnMAAjNJPhxU9vOG8H4aWF2ahMY1Qvv0QdrBpdLSrYzIFEtffpc5en40ieyPghK3INYAL11KTAxpxTPTSksZB26lS6vrYR+5KkM49uz15nsstUDvscTVP6hGlev0EESts0NvL94Ld6Mjve7t7vZDZ6aty7lqhZszP4JOsTV77Pzs4WeUaKF31vU9pb+Zyu7X+fj/31b82LhKehSgRkXGpSJ/+Gh+X+Wf1mDVVxCUYujp/f2UW/zDZKsVPQ7TbspKQlrqbB+Zd7dd0LusokwffuTTTOcZbnDZ+kjk6zE2ZoyG9c8H+IzPIk8obybP36n9uZ8wnoBQfzn5TgQ/6dvEEwDrLyZrgF/oh5GEkI0/f1lFLEUu0HhuhU0Tn9lau7Y+RJCUppo6Ob5mq9V/AAGnNh8=
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/node-performance-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"List the scorecards whose current grade matches (ListScorecardsByGrade)"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/scorecards"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Lists every scorecard whose current grade is the one given, ordered by scorecardId ascending, one page at a time. The model names no window filter and no caller; the optional window filter and the keyset pagination (limit, after) are additive (ADR 0002, A18).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./list-scorecards-by-grade.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./list-scorecards-by-grade.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./list-scorecards-by-grade.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

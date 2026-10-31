@@ -1,0 +1,47 @@
+---
+id: node-performance-api
+title: "Node Performance API"
+description: "REST contract of the node-performance bounded context of the retail network, derived from retail-network-docs model/model.yaml (contexts[node-performance].rest, .aggregates, conventions.errors) and adjusted by the cross-context decisions (G20, G33, E18). Node Performance grades every node from observed facts only (purchase orders issued, accepted, rejected and expired, packages handed over against requiredShipBy, promises kept or broken, inventory feeds applied) over a 7-day and a 30-day window. A scorecard below the observation minimum (50) is PROVISIONAL. Both routes are read-only, so none takes an Idempotency-Key. vendor-connectivity calls GET /scorecards/{nodeId} in-organization to serve a vendor's scorecard read; delivery-promise and order-sourcing do not call this API, they consume NodeScorecardUpdated. No authentication, consistent with the rest of the retail network. Errors are RFC 9457 problem details (application/problem+json); the problem types are not-found (404) and validation-failed (422)."
+sidebar_label: Introduction
+sidebar_position: 0
+hide_title: true
+custom_edit_url: null
+---
+
+import ApiLogo from "@theme/ApiLogo";
+import Heading from "@theme/Heading";
+import SchemaTabs from "@theme/SchemaTabs";
+import TabItem from "@theme/TabItem";
+import Export from "@theme/ApiExplorer/Export";
+
+<span
+  className={"theme-doc-version-badge badge badge--secondary"}
+  children={"Version: 0.1.0"}
+>
+</span>
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Node Performance API"}
+>
+</Heading>
+
+
+
+REST contract of the node-performance bounded context of the retail network, derived from retail-network-docs model/model.yaml (contexts[node-performance].rest, .aggregates, conventions.errors) and adjusted by the cross-context decisions (G20, G33, E18). Node Performance grades every node from observed facts only (purchase orders issued, accepted, rejected and expired, packages handed over against requiredShipBy, promises kept or broken, inventory feeds applied) over a 7-day and a 30-day window. A scorecard below the observation minimum (50) is PROVISIONAL. Both routes are read-only, so none takes an Idempotency-Key. vendor-connectivity calls GET /scorecards/\{nodeId\} in-organization to serve a vendor's scorecard read; delivery-promise and order-sourcing do not call this API, they consume NodeScorecardUpdated. No authentication, consistent with the rest of the retail network. Errors are RFC 9457 problem details (application/problem+json); the problem types are not-found (404) and validation-failed (422).
+
+<div
+  style={{"display":"flex","flexDirection":"column","marginBottom":"var(--ifm-paragraph-margin-bottom)"}}
+>
+  <h3
+    style={{"marginBottom":"0.25rem"}}
+  >
+    Contact
+  </h3><span>
+    node-performance maintainers: 
+  </span><span>
+    URL: [https://github.com/IQVO/node-performance](https://github.com/IQVO/node-performance)
+  </span>
+</div>
+      

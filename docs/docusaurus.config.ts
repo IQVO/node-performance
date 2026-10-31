@@ -6,7 +6,7 @@ import type * as OpenApiPlugin from 'docusaurus-plugin-openapi-docs';
 const config: Config = {
   title: 'Node Performance',
   tagline:
-    'Node Performance: a Supporting bounded context of the retail-network domain (warehouse-systems).',
+    'Measured node performance: a Supporting bounded context of the retail network that grades every node from observed facts.',
   favicon: 'img/favicon.svg',
 
   future: {

@@ -35,7 +35,12 @@ function HomepageHeader() {
           {siteConfig.title}
         </Heading>
         <p className={styles.heroSubtitle}>{siteConfig.tagline}</p>
-        <p className={styles.heroLead}>TODO-LEAD</p>
+        <p className={styles.heroLead}>
+          Node Performance measures every node of the retail network against what it declared and what
+          was asked of it, over rolling 7-day and 30-day windows, from observed facts only. It grades
+          each node A to D, publishes the grade as an event for delivery promising and order sourcing,
+          and serves it read-only over REST, MCP and A2A.
+        </p>
         <div className={styles.buttons}>
           <Link className="button button--primary button--lg" to="/docs/overview/introduction">
             Read the docs

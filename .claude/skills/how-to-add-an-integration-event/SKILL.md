@@ -5,7 +5,7 @@ description: Publish or consume a cross-service Kafka event in this service: Clo
 
 # How to add an integration event
 
-node-performance publishes two events and consumes thirteen event types (ADR 0003,
+node-performance publishes two events and consumes fifteen event types (ADR 0003,
 ADR 0004). The envelope is CloudEvents 1.0 only; read
 `.claude/rules/integration-events.md` and `.claude/rules/fleet/cloudevents.md`
 first. The worked example is `NodeThresholdBreached` (published, analytics only) and
@@ -58,7 +58,7 @@ first. The worked example is `NodeThresholdBreached` (published, analytics only)
    unit of work with the inbox claim (`processed_events`, keyed by the CloudEvents id),
    so a redelivery is a no-op; a value the domain refuses becomes `ErrInvalidEvent`.
 4. A new topic needs its own consumer group env var (a boot error naming it, listed
-   in `docs/runtime.md` and the chart) and a `Consumer` in `NewConsumers`.
+   in `docs/docs/overview/runtime.md` and the chart) and a `Consumer` in `NewConsumers`.
 5. Tests: the handler in `consumer_test.go` over the memory doubles, the loop in
    `loop_test.go`, and the real broker in `consumer_integration_test.go`.
 

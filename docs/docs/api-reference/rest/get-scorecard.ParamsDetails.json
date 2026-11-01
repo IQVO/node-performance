@@ -1,0 +1,1 @@
+{"parameters":[{"name":"nodeId","in":"path","required":true,"description":"The node id minted by node-topology.","schema":{"type":"string","maxLength":64,"example":"N-0042"}}]}

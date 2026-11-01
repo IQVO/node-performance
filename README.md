@@ -20,25 +20,21 @@ This project is a domain-driven design study. It is not associated with, endorse
 
 ## Documentation
 
-The context is documented on the fleet-wide warehouse-docs site, in the
-retail-network section: **<https://iqvo.github.io/warehouse-docs/network/contexts/node-performance>**
-(the model under `network/model/model.yaml` in IQVO/warehouse-docs is the
-single source of truth). Fleet-wide network pages:
-[strategic design](https://iqvo.github.io/warehouse-docs/network/strategic-design/subdomain-classification),
-[the CloudEvents event standard](https://iqvo.github.io/warehouse-docs/network/strategic-design/event-standard-cloudevents),
-the [node model](https://iqvo.github.io/warehouse-docs/network/network-model/node-model),
-and the [WMS/WES integration seam](https://iqvo.github.io/warehouse-docs/network/integration/wms-wes-integration).
-This repository's own references are [`docs/runtime.md`](docs/runtime.md)
-(configuration, probes, shutdown), [`docs/operations/runbook.md`](docs/operations/runbook.md)
-and the packaging checklist [`docs/before-first-release.md`](docs/before-first-release.md).
-
-Page map (on the warehouse-docs site, under `network/contexts/node-performance/`):
+The service has its own documentation site: **<https://iqvo.github.io/node-performance/>**
+(built from [`docs/`](docs/) with Docusaurus; the model under `network/model/model.yaml` in
+IQVO/warehouse-docs stays the design source of truth, and the context is also described on the
+fleet-wide [warehouse-docs site](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance)).
 
 | Area | Pages |
 |---|---|
-| Business context | [Business context](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/business-context), [Use cases](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/use-cases) |
-| Language & model | [Ubiquitous language](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/ubiquitous-language), [Domain events](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/domain-events), [Domain message flow](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/domain-message-flow), [Class diagram](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/class-diagram), [Sequence diagrams](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/sequence-diagrams), [Entity-relationship](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/entity-relationship) |
-| DDD canvases | [Core domain chart](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/core-domain-chart), [Bounded context canvas](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/bounded-context-canvas), [Aggregate design canvas](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/aggregate-design-canvas), [EventStorming](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/eventstorming), [Context map](https://iqvo.github.io/warehouse-docs/network/contexts/node-performance/context-map) |
+| Overview | [Introduction](https://iqvo.github.io/node-performance/docs/overview/introduction), [Architecture](https://iqvo.github.io/node-performance/docs/overview/architecture), [Runtime](https://iqvo.github.io/node-performance/docs/overview/runtime), [Quickstart](https://iqvo.github.io/node-performance/docs/overview/quickstart) |
+| Operations | [Configuration](https://iqvo.github.io/node-performance/docs/operations/configuration), [Runbook](https://iqvo.github.io/node-performance/docs/operations/runbook), [Observability](https://iqvo.github.io/node-performance/docs/operations/observability), [Troubleshooting](https://iqvo.github.io/node-performance/docs/operations/troubleshooting), [Before first release](https://iqvo.github.io/node-performance/docs/operations/before-first-release) |
+| Development | [Testing](https://iqvo.github.io/node-performance/docs/development/testing) |
+| Domain-driven design | [Ubiquitous language](https://iqvo.github.io/node-performance/docs/ddd/ubiquitous-language), [Use cases](https://iqvo.github.io/node-performance/docs/ddd/use-cases), [Subdomain classification](https://iqvo.github.io/node-performance/docs/ddd/subdomain-classification), [DDD artifacts](https://iqvo.github.io/node-performance/docs/ddd/ddd-artifacts) |
+| DDD artifacts | [Core domain chart](https://iqvo.github.io/node-performance/docs/ddd/core-domain-chart), [Bounded context canvas](https://iqvo.github.io/node-performance/docs/ddd/bounded-context-canvas), [Context map](https://iqvo.github.io/node-performance/docs/ddd/context-map), [Aggregate design canvas](https://iqvo.github.io/node-performance/docs/ddd/aggregate-design-canvas), [Domain message flow](https://iqvo.github.io/node-performance/docs/ddd/domain-message-flow), [EventStorming](https://iqvo.github.io/node-performance/docs/ddd/eventstorming), [Class diagram](https://iqvo.github.io/node-performance/docs/ddd/class-diagram), [Entity relationship](https://iqvo.github.io/node-performance/docs/ddd/entity-relationship), [Sequence diagrams](https://iqvo.github.io/node-performance/docs/ddd/sequence-diagrams), [Domain events](https://iqvo.github.io/node-performance/docs/ddd/domain-events) |
+| API reference | [API overview](https://iqvo.github.io/node-performance/docs/api-reference), [Event catalogue](https://iqvo.github.io/node-performance/docs/api-reference/events), the generated REST reference |
+| Ecosystem | [Integration](https://iqvo.github.io/node-performance/docs/ecosystem/integration), [MCP tools](https://iqvo.github.io/node-performance/docs/mcp/tools) |
+| Decisions | [ADR index](https://iqvo.github.io/node-performance/docs/adr) (11 ADRs, sources in [`docs/adr/`](docs/adr/index.md)) |
 
 ## What it does
 

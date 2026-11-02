@@ -13,9 +13,11 @@ wired in `cmd/api/run.go` `buildServer`). Both business routes are reads:
 
 - `GET /scorecards/{nodeId}` -> `Queries.GetScorecard` (`{"nodeId", "scorecards":[7d, 30d]}`;
   404 `not-found` for a node nothing was observed about)
-- `GET /scorecards?grade=&window=&limit=&after=` -> `Queries.ListScorecardsByGrade`
+- `GET /scorecards?grade=&window=&limit=&cursor=` -> `Queries.ListScorecardsByGrade`
   (`{"items":[...], "nextCursor"}`; ordered by `scorecardId`, keyset pagination,
-  `limit` 1 to 500, default 100)
+  `limit` 1 to 500, default 100; an invalid limit or cursor is 400
+  `invalid-limit` / `invalid-cursor`, an undeclared query parameter is 400
+  `unknown-query-parameter`
 - `GET /healthz` (liveness), `GET /readyz` (readiness): not business operations.
 
 vendor-connectivity calls `GET /scorecards/{nodeId}` inside the organization; no

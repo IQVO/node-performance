@@ -33,10 +33,10 @@ info:
     `retailnetwork.node-performance.analytics`. Both types are catalogued in
     ADR 0004.
 
-    **Consumed.** Thirteen events from five producers, each topic under its own stable
+    **Consumed.** Fifteen event types from six producers (six consumers), each topic under its own stable
     consumer group named by a mandatory environment variable (ADR 0003); every message is
     deduplicated on the CloudEvents `id` in the `processed_events` inbox, in the
-    same transaction as its effect. The consumed messages below are tolerant
+    same transaction as its effect. A transient failure is retried with capped backoff and then dead-lettered to `<topic>.dlq`; a payload that can never be applied is dead-lettered at once; a message that is not a CloudEvents 1.0 event, or whose type has no handler, is skipped. The consumed messages below are tolerant
     local copies: only the fields this service relies on are required, unknown
     fields and unknown types are ignored, dispatch is on the full `type`.
 
@@ -372,7 +372,7 @@ components:
       name: VendorOnboarded
       title: Vendor onboarded
       summary: A vendor was onboarded.
-      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.vendoraccount.VendorOnboarded`, from vendor-connectivity. Fields relied on: vendorId. No node scorecard metric reads it: the model gives it no use here (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
+      description: "`type` = `com.retailnetwork.partner.vendor-connectivity.vendoraccount.VendorOnboarded`, from vendor-connectivity. No field is read (the handler only writes the inbox row). No node scorecard metric reads it: the model gives it no use here (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
       contentType: application/cloudevents+json
       tags:
         - name: consumed
@@ -752,7 +752,7 @@ components:
       name: NodeRegistered
       title: Node registered
       summary: A node was registered in state PROPOSED.
-      description: "`type` = `com.retailnetwork.logistics.node-topology.node.NodeRegistered`, from node-topology. Fields relied on: nodeId. No scorecard metric reads it: a scorecard is built from observed facts, never from a declaration (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
+      description: "`type` = `com.retailnetwork.logistics.node-topology.node.NodeRegistered`, from node-topology. No field is read (the handler only writes the inbox row). No scorecard metric reads it: a scorecard is built from observed facts, never from a declaration (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
       contentType: application/cloudevents+json
       tags:
         - name: consumed
@@ -785,7 +785,7 @@ components:
       name: NodeOperationalProfileDeclared
       title: Node operational profile declared
       summary: A new operational profile revision was stored for a node.
-      description: "`type` = `com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared`, from node-topology. Fields relied on: nodeId. The declared profile is what a scorecard is measured against, never an input of it (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
+      description: "`type` = `com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared`, from node-topology. No field is read (the handler only writes the inbox row). The declared profile is what a scorecard is measured against, never an input of it (ADR 0002, A4). Recorded in the inbox only. Every other field is ignored."
       contentType: application/cloudevents+json
       tags:
         - name: consumed
@@ -885,7 +885,6 @@ components:
             type: { const: "com.retailnetwork.partner.vendor-connectivity.vendoraccount.VendorOnboarded" }
             data:
               type: object
-              required: [vendorId]
               properties:
                 vendorId: { type: string }
     PurchaseOrderIssuedEvent:
@@ -1056,7 +1055,6 @@ components:
             type: { const: "com.retailnetwork.logistics.node-topology.node.NodeRegistered" }
             data:
               type: object
-              required: [nodeId]
               properties:
                 nodeId: { type: string }
     NodeOperationalProfileDeclaredEvent:
@@ -1067,6 +1065,5 @@ components:
             type: { const: "com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared" }
             data:
               type: object
-              required: [nodeId]
               properties:
                 nodeId: { type: string }

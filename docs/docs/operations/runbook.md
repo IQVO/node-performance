@@ -37,7 +37,7 @@ never dial Kafka and cannot write.
 Inside the `api` process (`cmd/api/run.go`, `cmd/api/workers.go`):
 
 - **REST** on `HTTP_ADDR` (default `:8080`): chi, `GET /scorecards/{nodeId}`,
-  `GET /scorecards?grade=&window=&limit=&after=`, plus the probes. Reads only, no
+  `GET /scorecards?grade=&window=&limit=&cursor=`, plus the probes. Reads only, no
   authentication, no state-changing route (`internal/adapters/inbound/http`).
 - **Six Kafka consumers** (vendor-connectivity, shipping-and-tracking, delivery-promise,
   offer-availability, node-topology, seller-inbound), one message at a time, offset committed

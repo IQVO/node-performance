@@ -49,7 +49,7 @@ describe("ScorecardListScreen", () => {
       // Without a cursor: the full first page (nextCursor set). With one:
       // the last page, a single row and no cursor.
       "GET /scorecards": (call) =>
-        call.query.get("after")
+        call.query.get("cursor")
           ? json(gradeAPage({ items: [gradeAPage().items[2]], nextCursor: undefined }))
           : json(gradeAPage()),
     });

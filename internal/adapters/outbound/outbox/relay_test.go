@@ -49,7 +49,7 @@ func (s *fakeStore) Drain(ctx context.Context, limit, maxAttempts int, send func
 		}
 		if err := send(ctx, r.msg); err != nil {
 			r.attempts++
-			return published, &outbox.SendFailure{RowID: r.id, Message: r.msg, Attempts: r.attempts, Err: err}
+			return published, &outbox.SendFailureError{RowID: r.id, Message: r.msg, Attempts: r.attempts, Err: err}
 		}
 		r.published, r.attempts = true, r.attempts+1
 		published++
@@ -101,7 +101,7 @@ func TestAFailedRowStopsThePassAndKeepsTheOrder(t *testing.T) {
 	sink := &recordingSink{fail: map[string]error{"b": errors.New("broker down")}}
 	r := relay.NewOutboxRelay(store, sink, quiet(), relay.WithMaxAttempts(5))
 	n, err := r.RelayOnce(context.Background())
-	var sf *outbox.SendFailure
+	var sf *outbox.SendFailureError
 	if !errors.As(err, &sf) || sf.RowID != 2 || sf.Attempts != 1 || n != 1 {
 		t.Fatalf("pass = %d, %v", n, err)
 	}

@@ -21,10 +21,10 @@ var errBoom = errors.New("boom")
 // saveAll stores a scorecard, facts and an inbox row through ctx.
 func saveAll(t *testing.T, f Fixture, ctx context.Context) error {
 	t.Helper()
-	if err := f.Scorecards.Save(ctx, NewScorecard(t, "node-1", scorecard.Window7d)); err != nil {
+	if err := f.Scorecards.Save(ctx, NewScorecard(t, node1, scorecard.Window7d)); err != nil {
 		return err
 	}
-	if err := f.Facts.Upsert(ctx, scorecard.PurchaseOrderFacts{PoNumber: "po-1", NodeID: "node-1", RequiredShipBy: At(3)}); err != nil {
+	if err := f.Facts.Upsert(ctx, scorecard.PurchaseOrderFacts{PoNumber: po1, NodeID: node1, RequiredShipBy: At(3)}); err != nil {
 		return err
 	}
 	_, err := f.Inbox.MarkProcessed(ctx, "evt-1", "com.example.A", Now)
@@ -35,10 +35,10 @@ func saveAll(t *testing.T, f Fixture, ctx context.Context) error {
 func storedAnything(t *testing.T, f Fixture) bool {
 	t.Helper()
 	ctx := context.Background()
-	if _, err := f.Scorecards.Get(ctx, "node-1:7d"); err == nil {
+	if _, err := f.Scorecards.Get(ctx, node1ID7d); err == nil {
 		return true
 	}
-	if _, err := f.Facts.Get(ctx, "po-1"); err == nil {
+	if _, err := f.Facts.Get(ctx, po1); err == nil {
 		return true
 	}
 	fresh, err := f.Inbox.MarkProcessed(ctx, "evt-1", "com.example.A", Now)
@@ -49,10 +49,10 @@ func storedAnything(t *testing.T, f Fixture) bool {
 func uowCommit(t *testing.T, f Fixture) {
 	noErr(t, f.UoW.Do(context.Background(), func(ctx context.Context) error { return saveAll(t, f, ctx) }))
 	ctx := context.Background()
-	if _, err := f.Scorecards.Get(ctx, "node-1:7d"); err != nil {
+	if _, err := f.Scorecards.Get(ctx, node1ID7d); err != nil {
 		t.Fatalf("a committed unit lost the scorecard: %v", err)
 	}
-	if _, err := f.Facts.Get(ctx, "po-1"); err != nil {
+	if _, err := f.Facts.Get(ctx, po1); err != nil {
 		t.Fatalf("a committed unit lost the facts: %v", err)
 	}
 	if mark(t, f, ctx, "evt-1", "com.example.A") {

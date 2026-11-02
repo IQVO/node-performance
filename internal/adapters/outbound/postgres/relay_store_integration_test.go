@@ -69,7 +69,7 @@ func TestAFailedSendStopsThePassKeepsTheSentRowsAndRecordsTheFailure(t *testing.
 		}
 		return nil
 	})
-	var sf *outbox.SendFailure
+	var sf *outbox.SendFailureError
 	if !errors.As(err, &sf) || !errors.Is(err, boom) || sf.Attempts != 1 || n != 1 || calls != 2 {
 		t.Fatalf("Drain = %d, %v (calls %d)", n, err, calls)
 	}
@@ -96,7 +96,7 @@ func TestTheAttemptCapExcludesAPoisonRow(t *testing.T) {
 	}
 	for attempt := 1; attempt <= 3; attempt++ {
 		n, err := published(t, store, 10, 3, send)
-		var sf *outbox.SendFailure
+		var sf *outbox.SendFailureError
 		if !errors.As(err, &sf) || sf.Attempts != attempt || n != 0 {
 			t.Fatalf("attempt %d: %d, %v", attempt, n, err)
 		}
@@ -108,7 +108,7 @@ func TestTheAttemptCapExcludesAPoisonRow(t *testing.T) {
 	}
 	// with no cap (0) the row is claimed again
 	n, err = published(t, store, 10, 0, send)
-	var sf *outbox.SendFailure
+	var sf *outbox.SendFailureError
 	if !errors.As(err, &sf) || sf.Attempts != 4 || n != 0 {
 		t.Fatalf("unlimited: %d, %v", n, err)
 	}

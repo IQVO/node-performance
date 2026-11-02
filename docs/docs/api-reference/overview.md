@@ -51,8 +51,10 @@ plus `/healthz` and `/readyz` (`internal/adapters/inbound/http/server.go`). See 
   `malformed-request-query` and
   `malformed-request-body` (400, a NUL character), `method-not-allowed` (405),
   `concurrent-update` (409), `dependency-unavailable` (503, `/readyz` only) and `internal-error`
-  (500). The OpenAPI document lists `not-found` and `validation-failed`; the others come from the
-  adapter (`internal/adapters/inbound/http/problems.go`). An unknown path answers `404 not-found`
+  (500). The OpenAPI document lists the problem responses each operation can answer (`400`, `404`,
+  `422`, `500`); `malformed-request-body`, `method-not-allowed`, `concurrent-update` and
+  `dependency-unavailable` come from the router and the adapter
+  (`internal/adapters/inbound/http/problems.go`). An unknown path answers `404 not-found`
   too.
 - **Auth**: none. The fleet reverted REST, MCP and A2A auth on 2026-09-11, and
   `TestNoAuthMiddlewareReintroduced` fails CI if auth middleware returns under

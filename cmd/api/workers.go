@@ -54,31 +54,63 @@ func startConsumers(ctx context.Context, cfg config, intake usecases.Intake, log
 
 // startRecompute starts the scheduler: every interval it recomputes the
 // scorecards that are due (ADR 0002, A15). A failed round is logged and retried
-// at the next tick; the loop only returns when ctx is done.
-func startRecompute(ctx context.Context, interval time.Duration, recompute usecases.Recompute, logger *slog.Logger) *worker {
+// at the next tick; the loop only returns when ctx is done. When lease is
+// non-nil, each round runs under it, so of the replicas running the scheduler
+// only the lease holder recomputes.
+func startRecompute(ctx context.Context, interval time.Duration, recompute usecases.Recompute, lease recomputeLease, logger *slog.Logger) *worker {
 	return start(ctx, logger, "recompute scheduler", func(ctx context.Context) error {
-		return runRecompute(ctx, interval, recompute, logger)
+		return runRecompute(ctx, interval, recompute, lease, logger)
 	})
 }
 
-func runRecompute(ctx context.Context, interval time.Duration, recompute usecases.Recompute, logger *slog.Logger) error {
+// recomputeLease is the scheduler's exclusive lease (the Postgres advisory
+// try-lock of internal/adapters/outbound/postgres.RecomputeLease): Acquire
+// tries to hold it for one round; ok=false means another replica holds it and
+// the round is skipped. The returned release frees the lease when the round
+// ended.
+type recomputeLease interface {
+	Acquire(ctx context.Context) (release func(), ok bool, err error)
+}
+
+func runRecompute(ctx context.Context, interval time.Duration, recompute usecases.Recompute, lease recomputeLease, logger *slog.Logger) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		res, err := recompute.Run(ctx)
-		switch {
-		case ctx.Err() != nil:
-			return ctx.Err()
-		case err != nil:
-			logger.Error("recompute round failed", "error", err, "recomputed", res.Recomputed, "events", res.Events)
-		case res.Recomputed > 0 || res.Conflicts > 0:
-			logger.Info("recompute round", "recomputed", res.Recomputed, "events", res.Events, "conflicts", res.Conflicts)
-		}
+		runRecomputeRound(ctx, recompute, lease, logger)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
 		}
+	}
+}
+
+// runRecomputeRound runs one round, under the lease when one is configured. A
+// round another replica holds is skipped; a lease the database refuses to
+// grant (an error) skips the round too — the next tick retries, and the
+// scheduler loop keeps running either way.
+func runRecomputeRound(ctx context.Context, recompute usecases.Recompute, lease recomputeLease, logger *slog.Logger) {
+	if lease != nil {
+		release, ok, err := lease.Acquire(ctx)
+		switch {
+		case ctx.Err() != nil:
+			return
+		case err != nil:
+			logger.Error("recompute lease acquire failed", "error", err)
+			return
+		case !ok:
+			logger.Info("recompute round skipped, another replica holds the lease")
+			return
+		}
+		defer release()
+	}
+	res, err := recompute.Run(ctx)
+	switch {
+	case ctx.Err() != nil:
+	case err != nil:
+		logger.Error("recompute round failed", "error", err, "recomputed", res.Recomputed, "events", res.Events)
+	case res.Recomputed > 0 || res.Conflicts > 0:
+		logger.Info("recompute round", "recomputed", res.Recomputed, "events", res.Events, "conflicts", res.Conflicts)
 	}
 }
 

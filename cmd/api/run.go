@@ -77,7 +77,7 @@ func run(ctx context.Context) error {
 	consumers, closeConsumers := startConsumers(workCtx, cfg, usecases.NewIntake(ad.deps), logger)
 	work := make([]*worker, 0, len(consumers)+1)
 	work = append(work, consumers...)
-	work = append(work, startRecompute(workCtx, cfg.recomputeInterval, usecases.NewRecompute(ad.deps), logger))
+	work = append(work, startRecompute(workCtx, cfg.recomputeInterval, usecases.NewRecompute(ad.deps), postgres.NewRecomputeLease(ad.pool), logger))
 	relay := startOutboxRelay(relayCtx, ad.relayStore, cfg, logger)
 
 	all := make([]*worker, 0, len(work)+1)

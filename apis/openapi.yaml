@@ -58,7 +58,18 @@ paths:
                 type: not-found
                 title: Not found
                 status: 404
-                detail: No scorecard exists for node N-0042.
+                detail: "not found: no scorecard for node N-0042"
+        '422':
+          description: "validation-failed (ErrValidation): the nodeId is not 1 to 64 characters from A-Z a-z 0-9 . _ - starting with a letter or digit (a ':' is refused too)."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: validation-failed
+                title: Validation failed
+                status: 422
+                detail: "validation failed: nodeId must be 1 to 64 characters from A-Z a-z 0-9 . _ -"
         '400':
           description: "malformed-request-query: the query string carries a NUL character (U+0000), rejected by the NUL middleware before the handler."
           content:
@@ -125,7 +136,7 @@ paths:
                 status: 400
                 detail: cursor is not a valid page token.
         '422':
-          description: "validation-failed (ErrValidation): grade or window is not an accepted value."
+          description: "validation-failed (ErrValidation): grade or window is not an accepted value, or the cursor payload is longer than 80 characters."
           content:
             application/problem+json:
               schema:
@@ -134,7 +145,7 @@ paths:
                 type: validation-failed
                 title: Validation failed
                 status: 422
-                detail: grade must be one of A, B, C, D, PROVISIONAL.
+                detail: "validation failed: grade must be one of A, B, C, D, PROVISIONAL"
         '500':
           description: "internal-error: the handler panicked (the recoverer middleware answers) or the use case returned an error no problem maps to. The detail never leaks internals; the real error is logged."
           content:
@@ -172,7 +183,9 @@ components:
       description: The node id minted by node-topology.
       schema:
         type: string
+        minLength: 1
         maxLength: 64
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$'
         example: N-0042
   schemas:
     GradeValue:

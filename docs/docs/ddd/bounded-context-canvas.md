@@ -98,9 +98,6 @@ instant of `requiredShipBy` is on time, and the read routes take no `Idempotency
 
 ## 11. Open questions and discrepancies
 
-- The documented number of consumed events differs between sources: the code, `apis/asyncapi.yaml`
-  and the README say 15 types from six producers on six topics (one per producer), while the repo's
-  agent guide (`AGENTS.md`) still says "thirteen event types from five producers".
 - `VendorOnboarded`, `SubmissionProcessed`, `NodeRegistered` and `NodeOperationalProfileDeclared` are
   consumed with no effect (inbox row only). The declared profile never enters a metric, so there is
   no "declared next to measured" read model.

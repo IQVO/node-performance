@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -35,11 +36,66 @@ type fixedClock struct{}
 
 func (fixedClock) Now() time.Time { return time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC) }
 
+// leaseStub is a scripted recomputeLease: held says whether Acquire succeeds,
+// and the counters record what the scheduler did with it.
+type leaseStub struct {
+	held     atomic.Bool
+	acquired atomic.Int32
+	released atomic.Int32
+}
+
+func (l *leaseStub) Acquire(context.Context) (func(), bool, error) {
+	l.acquired.Add(1)
+	if !l.held.Load() {
+		return nil, false, nil
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() { l.released.Add(1) })
+	}, true, nil
+}
+
+func TestTheSchedulerSkipsRoundsAnotherReplicaHoldsAndRunsUnderTheLease(t *testing.T) {
+	logger, logs := quiet()
+	stub := &listDueStub{}
+	lease := &leaseStub{}
+	lease.held.Store(false) // another replica holds it
+	ctx, cancel := context.WithCancel(context.Background())
+	w := startRecompute(ctx, 5*time.Millisecond, recomputeOver(stub), lease, logger)
+	deadline := time.After(5 * time.Second)
+	for lease.acquired.Load() < 2 {
+		select {
+		case <-deadline:
+			t.Fatalf("only %d acquire attempts", lease.acquired.Load())
+		case <-time.After(time.Millisecond):
+		}
+	}
+	if stub.calls.Load() != 0 {
+		t.Fatalf("a held lease must skip the round, %d rounds ran", stub.calls.Load())
+	}
+	lease.held.Store(true) // this replica takes over
+	for stub.calls.Load() < 1 || lease.released.Load() < 1 {
+		select {
+		case <-deadline:
+			t.Fatalf("rounds %d releases %d", stub.calls.Load(), lease.released.Load())
+		case <-time.After(time.Millisecond):
+		}
+	}
+	if lease.released.Load() > lease.acquired.Load() {
+		t.Fatalf("every lease is released once: %d releases of %d acquires", lease.released.Load(), lease.acquired.Load())
+	}
+	cancel()
+	await(logger, w)
+	if !strings.Contains(logs.String(), "another replica holds the lease") {
+		t.Fatalf("a skipped round is logged:\n%s", logs.String())
+	}
+}
+
 func TestTheSchedulerRecomputesEveryIntervalUntilItsContextIsDone(t *testing.T) {
 	logger, logs := quiet()
 	stub := &listDueStub{err: errors.New("db down")}
 	ctx, cancel := context.WithCancel(context.Background())
-	w := startRecompute(ctx, 5*time.Millisecond, recomputeOver(stub), logger)
+	w := startRecompute(ctx, 5*time.Millisecond, recomputeOver(stub), nil, logger)
 	deadline := time.After(5 * time.Second)
 	for stub.calls.Load() < 3 {
 		select {

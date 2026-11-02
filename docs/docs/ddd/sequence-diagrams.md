@@ -175,5 +175,6 @@ sequenceDiagram
 
 Source: `internal/application/usecases/queries.go`, `internal/adapters/inbound/http/handlers.go`.
 `GET /scorecards?grade=` follows the same shape through `ScorecardReader.ByGrade`, with
-`422 validation-failed` for a bad `grade`, `window`, `limit` or `after`. MCP and A2A call the same
+`422 validation-failed` for a bad `grade` or `window` (REST: `400 invalid-limit`, `invalid-cursor` or
+`unknown-query-parameter` for the paging parameters). MCP and A2A call the same
 two use cases.

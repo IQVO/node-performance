@@ -36,6 +36,10 @@ var (
 	malformedBody  = problem{http.StatusBadRequest, "malformed-request-body", "Malformed request body"}
 	malformedQuery = problem{http.StatusBadRequest, "malformed-request-query", "Malformed query string"}
 
+	invalidLimit          = problem{http.StatusBadRequest, "invalid-limit", "Invalid limit"}
+	invalidCursor         = problem{http.StatusBadRequest, "invalid-cursor", "Invalid cursor"}
+	unknownQueryParameter = problem{http.StatusBadRequest, "unknown-query-parameter", "Unknown query parameter"}
+
 	dependencyUnavailable = problem{http.StatusServiceUnavailable, "dependency-unavailable", "A runtime dependency is unavailable"}
 )
 

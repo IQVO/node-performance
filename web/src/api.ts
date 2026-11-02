@@ -92,10 +92,10 @@ export async function getScorecard(nodeId: string): Promise<NodeScorecards> {
   return request<NodeScorecards>(`/scorecards/${seg(nodeId)}`);
 }
 
-/** GET /scorecards?grade=&window=&limit=&after= -- one page of a grade. */
+/** GET /scorecards?grade=&window=&limit=&cursor= -- one page of a grade. */
 export async function listScorecards(q: ListScorecardsQuery): Promise<ScorecardList> {
   const res = await request<ScorecardList>(
-    withQuery("/scorecards", { grade: q.grade, window: q.window, limit: q.limit, after: q.after }),
+    withQuery("/scorecards", { grade: q.grade, window: q.window, limit: q.limit, cursor: q.cursor }),
   );
   return { items: res.items ?? [], nextCursor: res.nextCursor || undefined };
 }

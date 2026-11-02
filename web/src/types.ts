@@ -51,5 +51,5 @@ export interface ListScorecardsQuery {
   grade: Grade;
   window?: Window;
   limit?: number;
-  after?: string;
+  cursor?: string;
 }

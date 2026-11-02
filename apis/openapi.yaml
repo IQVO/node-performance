@@ -19,8 +19,11 @@ info:
     a vendor's scorecard read; delivery-promise and order-sourcing do not call
     this API, they consume NodeScorecardUpdated. No authentication, consistent
     with the rest of the retail network. Errors are RFC 9457 problem details
-    (application/problem+json); the problem types are not-found (404) and
-    validation-failed (422).
+    (application/problem+json); the problem types are the 400 request ones
+    (malformed-request-query, invalid-limit, invalid-cursor,
+    unknown-query-parameter), not-found (404), validation-failed (422) and
+    internal-error (500, a panic answered by the recoverer or an error no
+    problem maps to; the detail never leaks internals).
 servers:
   - url: http://localhost:8080
 tags:
@@ -56,6 +59,28 @@ paths:
                 title: Not found
                 status: 404
                 detail: No scorecard exists for node N-0042.
+        '400':
+          description: "malformed-request-query: the query string carries a NUL character (U+0000), rejected by the NUL middleware before the handler."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: malformed-request-query
+                title: Malformed query string
+                status: 400
+                detail: a NUL character (U+0000) is not allowed in the query string
+        '500':
+          description: "internal-error: the handler panicked (the recoverer middleware answers) or the use case returned an error no problem maps to. The detail never leaks internals; the real error is logged."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: internal-error
+                title: Internal server error
+                status: 500
+                detail: an unexpected error occurred
   /scorecards:
     get:
       tags: [Scorecards]
@@ -110,6 +135,17 @@ paths:
                 title: Validation failed
                 status: 422
                 detail: grade must be one of A, B, C, D, PROVISIONAL.
+        '500':
+          description: "internal-error: the handler panicked (the recoverer middleware answers) or the use case returned an error no problem maps to. The detail never leaks internals; the real error is logged."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: internal-error
+                title: Internal server error
+                status: 500
+                detail: an unexpected error occurred
 components:
   parameters:
     Limit:
@@ -300,7 +336,7 @@ components:
       properties:
         type:
           type: string
-          description: Problem type slug, not-found or validation-failed.
+          description: Problem type slug, e.g. not-found, validation-failed, invalid-cursor or internal-error.
           example: not-found
         title:
           type: string

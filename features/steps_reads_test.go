@@ -51,7 +51,7 @@ func wantIDs(page views.ScorecardPage, want string) error {
 // refused fails unless err is the validation error of the read model.
 func refused(err error, what string) error {
 	if !errors.Is(err, shared.ErrValidation) {
-		return fmt.Errorf("%s = %v, want a validation error", what, err)
+		return fmt.Errorf("%s = %w, want a validation error", what, err)
 	}
 	return nil
 }

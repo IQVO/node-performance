@@ -10,6 +10,20 @@ import (
 	"github.com/claudioed/node-performance/internal/domain/shared"
 )
 
+// The fixture vocabulary the contract cases share: the nodes and scorecard
+// ids they seed and assert on, and the PROVISIONAL state/grade label.
+const (
+	node1       = "node-1"
+	node1ID7d   = "node-1:7d"
+	node1ID30d  = "node-1:30d"
+	node2ID7d   = "node-2:7d"
+	node2ID30d  = "node-2:30d"
+	aNodeID7d   = "a-node:7d"
+	bNodeID7d   = "b-node:7d"
+	po1         = "po-1"
+	provisional = "PROVISIONAL"
+)
+
 // Now is the fixed clock of the contract: whole seconds, so every adapter
 // (Postgres keeps microseconds) round-trips it exactly.
 var Now = time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)

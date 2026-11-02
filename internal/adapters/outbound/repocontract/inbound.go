@@ -16,8 +16,8 @@ var inboundCases = []named{
 	{"saves roll back with their unit of work", inboundRollsBack},
 }
 
-func shipment(id, node string, minutes int) scorecard.InboundShipment {
-	return scorecard.InboundShipment{ShipmentID: id, NodeID: scorecard.NodeID(node), ShippedAt: At(minutes)}
+func shipment(id string, minutes int) scorecard.InboundShipment {
+	return scorecard.InboundShipment{ShipmentID: id, NodeID: scorecard.NodeID(node1), ShippedAt: At(minutes)}
 }
 
 func receipt(id, node string, minutes, total, received int) scorecard.InboundReceipt {
@@ -37,18 +37,18 @@ func observations(t *testing.T, f Fixture, minutes int, nodes ...string) map[sco
 
 func inboundShipmentFirstWins(t *testing.T, f Fixture) {
 	ctx := context.Background()
-	isNew, err := f.Inbound.SaveShipment(ctx, shipment("shp-1", "node-1", 0))
+	isNew, err := f.Inbound.SaveShipment(ctx, shipment("shp-1", 0))
 	noErr(t, err)
 	if !isNew {
 		t.Fatal("the first save must be new")
 	}
-	isNew, err = f.Inbound.SaveShipment(ctx, shipment("shp-1", "node-1", -500))
+	isNew, err = f.Inbound.SaveShipment(ctx, shipment("shp-1", -500))
 	noErr(t, err)
 	if isNew {
 		t.Fatal("a repeat must not be new")
 	}
-	noErr(t, saveReceipt(f, receipt("shp-1", "node-1", 90, 1, 1)))
-	got := observations(t, f, -1000, "node-1")["node-1"]
+	noErr(t, saveReceipt(f, receipt("shp-1", node1, 90, 1, 1)))
+	got := observations(t, f, -1000, node1)[node1]
 	if len(got) != 1 || got[0].Minutes != 90 {
 		t.Fatalf("the stored instant must be the first one (90 minutes): %+v", got)
 	}
@@ -61,40 +61,40 @@ func saveReceipt(f Fixture, r scorecard.InboundReceipt) error {
 
 func inboundReceiptFirstWins(t *testing.T, f Fixture) {
 	ctx := context.Background()
-	isNew, err := f.Inbound.SaveReceipt(ctx, receipt("shp-1", "node-1", 60, 4, 3))
+	isNew, err := f.Inbound.SaveReceipt(ctx, receipt("shp-1", node1, 60, 4, 3))
 	noErr(t, err)
 	if !isNew {
 		t.Fatal("the first receipt must be new")
 	}
-	isNew, err = f.Inbound.SaveReceipt(ctx, receipt("shp-1", "node-1", 70, 9, 9))
+	isNew, err = f.Inbound.SaveReceipt(ctx, receipt("shp-1", node1, 70, 9, 9))
 	noErr(t, err)
 	if isNew {
 		t.Fatal("a second receipt of the shipment must not be new")
 	}
-	_, err = f.Inbound.SaveShipment(ctx, shipment("shp-1", "node-1", 0))
+	_, err = f.Inbound.SaveShipment(ctx, shipment("shp-1", 0))
 	noErr(t, err)
 	want := []scorecard.InboundObservation{{ReceivedAt: At(60), Minutes: 60, CartonsTotal: 4, CartonsReceived: 3}}
-	if got := observations(t, f, -1, "node-1")["node-1"]; !reflect.DeepEqual(got, want) {
+	if got := observations(t, f, -1, node1)[node1]; !reflect.DeepEqual(got, want) {
 		t.Fatalf("observations = %+v, want %+v", got, want)
 	}
 }
 
 func inboundJoin(t *testing.T, f Fixture) {
 	ctx := context.Background()
-	_, err := f.Inbound.SaveReceipt(ctx, receipt("shp-1", "node-1", 60, 2, 2))
+	_, err := f.Inbound.SaveReceipt(ctx, receipt("shp-1", node1, 60, 2, 2))
 	noErr(t, err)
-	if got := observations(t, f, -1, "node-1"); len(got) != 0 {
+	if got := observations(t, f, -1, node1); len(got) != 0 {
 		t.Fatalf("a parked receipt must not be returned: %+v", got)
 	}
-	_, err = f.Inbound.SaveShipment(ctx, shipment("shp-1", "node-1", 15))
+	_, err = f.Inbound.SaveShipment(ctx, shipment("shp-1", 15))
 	noErr(t, err)
-	got := observations(t, f, -1, "node-1")["node-1"]
+	got := observations(t, f, -1, node1)[node1]
 	if len(got) != 1 || got[0].Minutes != 45 {
 		t.Fatalf("the parked receipt must join when the shipment arrives: %+v", got)
 	}
-	_, err = f.Inbound.SaveShipment(ctx, shipment("shp-2", "node-1", 10))
+	_, err = f.Inbound.SaveShipment(ctx, shipment("shp-2", 10))
 	noErr(t, err)
-	if got := observations(t, f, -1, "node-1")["node-1"]; len(got) != 1 {
+	if got := observations(t, f, -1, node1)[node1]; len(got) != 1 {
 		t.Fatalf("a shipment without receipt adds nothing: %+v", got)
 	}
 }
@@ -102,14 +102,14 @@ func inboundJoin(t *testing.T, f Fixture) {
 func inboundFilters(t *testing.T, f Fixture) {
 	ctx := context.Background()
 	for _, id := range []string{"a", "b", "c"} {
-		_, err := f.Inbound.SaveShipment(ctx, shipment(id, "node-1", 0))
+		_, err := f.Inbound.SaveShipment(ctx, shipment(id, 0))
 		noErr(t, err)
 	}
-	noErr(t, saveReceipt(f, receipt("a", "node-1", 10, 1, 1)))
+	noErr(t, saveReceipt(f, receipt("a", node1, 10, 1, 1)))
 	noErr(t, saveReceipt(f, receipt("b", "node-2", 20, 1, 0)))
-	noErr(t, saveReceipt(f, receipt("c", "node-1", 30, 1, 1)))
-	got := observations(t, f, 10, "node-1", "node-2")
-	if len(got["node-1"]) != 1 || got["node-1"][0].Minutes != 30 || len(got["node-2"]) != 1 {
+	noErr(t, saveReceipt(f, receipt("c", node1, 30, 1, 1)))
+	got := observations(t, f, 10, node1, "node-2")
+	if len(got[node1]) != 1 || got[node1][0].Minutes != 30 || len(got["node-2"]) != 1 {
 		t.Fatalf("strictly after 10, per node: %+v", got)
 	}
 	if only := observations(t, f, -1, "node-2"); len(only) != 1 || len(only["node-2"]) != 1 {
@@ -123,14 +123,14 @@ func inboundFilters(t *testing.T, f Fixture) {
 func inboundRollsBack(t *testing.T, f Fixture) {
 	ctx := context.Background()
 	err := f.UoW.Do(ctx, func(ctx context.Context) error {
-		_, err := f.Inbound.SaveShipment(ctx, shipment("shp-1", "node-1", 0))
+		_, err := f.Inbound.SaveShipment(ctx, shipment("shp-1", 0))
 		noErr(t, err)
-		_, err = f.Inbound.SaveReceipt(ctx, receipt("shp-1", "node-1", 5, 1, 1))
+		_, err = f.Inbound.SaveReceipt(ctx, receipt("shp-1", node1, 5, 1, 1))
 		noErr(t, err)
 		return errBoom
 	})
 	wantErr(t, err, errBoom)
-	if got := observations(t, f, -1, "node-1"); len(got) != 0 {
+	if got := observations(t, f, -1, node1); len(got) != 0 {
 		t.Fatalf("a rolled back unit stored: %+v", got)
 	}
 }

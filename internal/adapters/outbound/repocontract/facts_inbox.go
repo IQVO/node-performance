@@ -36,12 +36,12 @@ func getFacts(t *testing.T, f Fixture, po string) scorecard.PurchaseOrderFacts {
 }
 
 func factsCreate(t *testing.T, f Fixture) {
-	want := scorecard.PurchaseOrderFacts{PoNumber: "po-1", NodeID: "node-1", IssuedAt: At(1), AckBy: At(2), RequiredShipBy: At(3)}
+	want := scorecard.PurchaseOrderFacts{PoNumber: po1, NodeID: node1, IssuedAt: At(1), AckBy: At(2), RequiredShipBy: At(3)}
 	noErr(t, f.Facts.Upsert(context.Background(), want))
-	if got := getFacts(t, f, "po-1"); !reflect.DeepEqual(got, want) {
+	if got := getFacts(t, f, po1); !reflect.DeepEqual(got, want) {
 		t.Fatalf("facts = %+v, want %+v", got, want)
 	}
-	partial := scorecard.PurchaseOrderFacts{PoNumber: "po-2", NodeID: "node-1", RequiredShipBy: At(3)}
+	partial := scorecard.PurchaseOrderFacts{PoNumber: "po-2", NodeID: node1, RequiredShipBy: At(3)}
 	noErr(t, f.Facts.Upsert(context.Background(), partial))
 	if got := getFacts(t, f, "po-2"); !reflect.DeepEqual(got, partial) || !got.IssuedAt.IsZero() || !got.AckBy.IsZero() {
 		t.Fatalf("a missing instant stays zero: %+v", got)
@@ -50,21 +50,21 @@ func factsCreate(t *testing.T, f Fixture) {
 
 func factsMerge(t *testing.T, f Fixture) {
 	ctx := context.Background()
-	noErr(t, f.Facts.Upsert(ctx, scorecard.PurchaseOrderFacts{PoNumber: "po-1", NodeID: "node-1", RequiredShipBy: At(3)}))
-	noErr(t, f.Facts.Upsert(ctx, scorecard.PurchaseOrderFacts{PoNumber: "po-1", NodeID: "node-1", IssuedAt: At(1), AckBy: At(2), RequiredShipBy: At(99)}))
-	want := scorecard.PurchaseOrderFacts{PoNumber: "po-1", NodeID: "node-1", IssuedAt: At(1), AckBy: At(2), RequiredShipBy: At(3)}
-	if got := getFacts(t, f, "po-1"); !reflect.DeepEqual(got, want) {
+	noErr(t, f.Facts.Upsert(ctx, scorecard.PurchaseOrderFacts{PoNumber: po1, NodeID: node1, RequiredShipBy: At(3)}))
+	noErr(t, f.Facts.Upsert(ctx, scorecard.PurchaseOrderFacts{PoNumber: po1, NodeID: node1, IssuedAt: At(1), AckBy: At(2), RequiredShipBy: At(99)}))
+	want := scorecard.PurchaseOrderFacts{PoNumber: po1, NodeID: node1, IssuedAt: At(1), AckBy: At(2), RequiredShipBy: At(3)}
+	if got := getFacts(t, f, po1); !reflect.DeepEqual(got, want) {
 		t.Fatalf("after the second upsert: %+v, want %+v", got, want)
 	}
-	noErr(t, f.Facts.Upsert(ctx, scorecard.PurchaseOrderFacts{PoNumber: "po-1", NodeID: "node-1"}))
-	if got := getFacts(t, f, "po-1"); !reflect.DeepEqual(got, want) {
+	noErr(t, f.Facts.Upsert(ctx, scorecard.PurchaseOrderFacts{PoNumber: po1, NodeID: node1}))
+	if got := getFacts(t, f, po1); !reflect.DeepEqual(got, want) {
 		t.Fatalf("an upsert without instants erased something: %+v", got)
 	}
 }
 
 func factsInvalid(t *testing.T, f Fixture) {
-	wantErr(t, f.Facts.Upsert(context.Background(), scorecard.PurchaseOrderFacts{PoNumber: "", NodeID: "node-1"}), shared.ErrValidation)
-	wantErr(t, f.Facts.Upsert(context.Background(), scorecard.PurchaseOrderFacts{PoNumber: "po-1", NodeID: "a:b"}), shared.ErrValidation)
+	wantErr(t, f.Facts.Upsert(context.Background(), scorecard.PurchaseOrderFacts{PoNumber: "", NodeID: node1}), shared.ErrValidation)
+	wantErr(t, f.Facts.Upsert(context.Background(), scorecard.PurchaseOrderFacts{PoNumber: po1, NodeID: "a:b"}), shared.ErrValidation)
 }
 
 func mark(t *testing.T, f Fixture, ctx context.Context, id, typ string) bool {

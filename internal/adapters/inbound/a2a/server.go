@@ -35,6 +35,12 @@ import (
 	"github.com/claudioed/node-performance/internal/application/views"
 )
 
+// agentName is this agent's name in the Agent Card and in its skill tags.
+const agentName = "node-performance"
+
+// mediaTypeJSON is the media mode every skill of this agent speaks.
+const mediaTypeJSON = "application/json"
+
 // The use-case contracts the skills call: the SAME interfaces the REST and
 // MCP adapters define. usecases.Queries satisfies both; the tests substitute
 // doubles. No write use case is reachable from here (docs/adr/0011).
@@ -79,7 +85,7 @@ type Deps struct {
 // are added here, not in a redesign, if that decision is ever reversed.
 func Card(cfg Config) *a2a.AgentCard {
 	return &a2a.AgentCard{
-		Name:        "node-performance",
+		Name:        agentName,
 		Description: "Node Performance agent for the retail network (read-only): answers how a node is performing, from the two scorecards (7-day and 30-day window) this context grades from observed facts only (on-time handover, acknowledgement latency, rejections, expiry, promise-kept rate and inventory feed freshness), and which nodes currently sit at a given grade (A, B, C, D or PROVISIONAL below 50 observations). It never changes data: observations are recorded by the event consumers and grades are computed by the service itself.",
 		Version:     cfg.Version,
 		Provider: &a2a.AgentProvider{
@@ -89,16 +95,16 @@ func Card(cfg Config) *a2a.AgentCard {
 		SupportedInterfaces: []*a2a.AgentInterface{
 			a2a.NewAgentInterface(cfg.AgentURL, a2a.TransportProtocolJSONRPC),
 		},
-		DefaultInputModes:  []string{"application/json", "text/plain"},
-		DefaultOutputModes: []string{"application/json", "text/plain"},
+		DefaultInputModes:  []string{mediaTypeJSON, "text/plain"},
+		DefaultOutputModes: []string{mediaTypeJSON, "text/plain"},
 		Capabilities:       a2a.AgentCapabilities{Streaming: false},
 		Skills: []a2a.AgentSkill{
 			{
 				ID:          skillNodePerformance,
 				Name:        "How is this node performing",
 				Description: "Read both scorecards of one node by nodeId: the 7-day and the 30-day window, in that order, each with its state (PROVISIONAL or GRADED), its grade (A, B, C, D, or PROVISIONAL below the observation minimum of 50), its metrics (onTimeHandoverRate, lateAckRate, rejectRate, expiryRate, promiseKeptRate, feedFreshnessP95Minutes, observations) and computedAt, omitted before the first recompute. Answers a 404 problem for a node nothing was observed about and a 422 problem for a malformed nodeId. Persists nothing.",
-				Tags:        []string{"node-performance", "scorecard", "read"},
-				InputModes:  []string{"application/json"},
+				Tags:        []string{agentName, "scorecard", "read"},
+				InputModes:  []string{mediaTypeJSON},
 				Examples: []string{
 					`{"skill":"node_performance","arguments":{"nodeId":"N-0042"}}`,
 				},
@@ -107,8 +113,8 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillNodesByGrade,
 				Name:        "Which nodes sit at this grade",
 				Description: "List the scorecards whose current grade matches, ordered by scorecardId ascending, one page at a time: grade is required (A, B, C, D or PROVISIONAL); the window filter (7d or 30d), the page size (limit, 1..500, default 100) and the cursor are optional. Pass the returned nextCursor as after to get the next page; it is absent on the last page. Answers a 422 problem for a bad grade, window, limit or cursor. Persists nothing.",
-				Tags:        []string{"node-performance", "scorecard", "grade", "read"},
-				InputModes:  []string{"application/json"},
+				Tags:        []string{agentName, "scorecard", "grade", "read"},
+				InputModes:  []string{mediaTypeJSON},
 				Examples: []string{
 					`{"skill":"nodes_by_grade","arguments":{"grade":"D"}}`,
 					`{"skill":"nodes_by_grade","arguments":{"grade":"A","window":"7d","limit":50}}`,

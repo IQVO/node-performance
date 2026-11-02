@@ -12,14 +12,14 @@ describe("listScorecards", () => {
     const api = mockApi({
       "GET /scorecards": json(gradeAPage()),
     });
-    await listScorecards({ grade: "A", window: "7d", limit: 25, after: "N-0042:7d" });
+    await listScorecards({ grade: "A", window: "7d", limit: 25, cursor: "N-0042:7d" });
     const call = api.to("GET /scorecards")[0];
     expect(call.path).toBe("/scorecards");
     expect(call.url).toContain("?");
     expect(call.query.get("grade")).toBe("A");
     expect(call.query.get("window")).toBe("7d");
     expect(call.query.get("limit")).toBe("25");
-    expect(call.query.get("after")).toBe("N-0042:7d");
+    expect(call.query.get("cursor")).toBe("N-0042:7d");
   });
 
   it("omits the absent optional filters entirely", async () => {
@@ -28,7 +28,7 @@ describe("listScorecards", () => {
     const call = api.to("GET /scorecards")[0];
     expect(call.query.get("window")).toBeNull();
     expect(call.query.get("limit")).toBeNull();
-    expect(call.query.get("after")).toBeNull();
+    expect(call.query.get("cursor")).toBeNull();
     expect(page.nextCursor).toBeUndefined();
     expect(page.items).toHaveLength(3);
   });

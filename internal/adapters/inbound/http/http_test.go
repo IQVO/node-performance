@@ -174,7 +174,7 @@ func TestListByGradeFiltersPagesAndValidates(t *testing.T) {
 	if cursor == "" || len(page1.json(t)["items"].([]any)) != 1 {
 		t.Fatalf("first page = %s", page1.raw)
 	}
-	page2 := get(h, "/scorecards?grade=PROVISIONAL&limit=1&after="+cursor)
+	page2 := get(h, "/scorecards?grade=PROVISIONAL&limit=1&cursor="+cursor)
 	if page2.status != 200 || len(page2.json(t)["items"].([]any)) != 1 {
 		t.Fatalf("second page = %s", page2.raw)
 	}
@@ -185,14 +185,26 @@ func TestListByGradeFiltersPagesAndValidates(t *testing.T) {
 
 func TestListByGradeRefusesWhatTheContractRefuses(t *testing.T) {
 	h := router(t, realServer(t))
-	for _, bad := range []string{"/scorecards", "/scorecards?grade=E", "/scorecards?grade=A&window=1d", "/scorecards?grade=A&limit=0", "/scorecards?grade=A&limit=501"} {
+	for _, bad := range []string{"/scorecards", "/scorecards?grade=E", "/scorecards?grade=A&window=1d"} {
 		if r := get(h, bad); r.status != 422 || r.problem(t) != "validation-failed" {
 			t.Errorf("%s = %d %s, want 422 validation-failed", bad, r.status, r.raw)
 		}
 	}
-	for _, bad := range []string{"/scorecards?grade=A&limit=ten", "/scorecards?grade=A&colour=red"} {
-		if r := get(h, bad); r.status != 400 || r.problem(t) != "malformed-request-query" {
-			t.Errorf("%s = %d %s, want 400 malformed-request-query", bad, r.status, r.raw)
+	for _, tc := range []struct{ target, slug string }{
+		{"/scorecards?grade=A&limit=ten", "invalid-limit"},
+		{"/scorecards?grade=A&limit=0", "invalid-limit"},
+		{"/scorecards?grade=A&limit=501", "invalid-limit"},
+		{"/scorecards?grade=A&limit=", "invalid-limit"},
+		{"/scorecards?grade=A&limit=1&limit=2", "invalid-limit"},
+		{"/scorecards?grade=A&cursor=!!!", "invalid-cursor"},
+		{"/scorecards?grade=A&cursor=a&cursor=b", "invalid-cursor"},
+		{"/scorecards?grade=A&colour=red", "unknown-query-parameter"},
+		{"/scorecards?grade=A&after=N-1:7d", "unknown-query-parameter"},
+		{"/scorecards?grade=A&offset=1", "unknown-query-parameter"},
+		{"/scorecards?grade=A&nextToken=x", "unknown-query-parameter"},
+	} {
+		if r := get(h, tc.target); r.status != 400 || r.problem(t) != tc.slug {
+			t.Errorf("%s = %d %s, want 400 %s", tc.target, r.status, r.raw, tc.slug)
 		}
 	}
 }
@@ -380,5 +392,37 @@ func TestInboundMetricsAreOptionalAndAdditiveOnTheScorecardRead(t *testing.T) {
 	listed := metrics("/scorecards?grade=A&window=30d")
 	if listed["inboundAccuracyRate"] != 0.5 {
 		t.Errorf("the list carries the metrics too: %v", listed)
+	}
+}
+
+// Walking a grade with limit=1 through nextCursor visits every scorecard once.
+func TestListByGradeWalkEveryPageNoDuplicateNoSkip(t *testing.T) {
+	h := router(t, realServer(t))
+	want := map[string]bool{}
+	for _, it := range get(h, "/scorecards?grade=A").json(t)["items"].([]any) {
+		want[it.(map[string]any)["scorecardId"].(string)] = true
+	}
+	if len(want) < 2 {
+		t.Fatalf("fixture needs at least two grade A scorecards, has %d", len(want))
+	}
+	seen, target := map[string]bool{}, "/scorecards?grade=A&limit=1"
+	for i := 0; i <= len(want); i++ {
+		r := get(h, target)
+		body := r.json(t)
+		for _, it := range body["items"].([]any) {
+			id := it.(map[string]any)["scorecardId"].(string)
+			if seen[id] {
+				t.Fatalf("duplicate %s", id)
+			}
+			seen[id] = true
+		}
+		next, _ := body["nextCursor"].(string)
+		if next == "" {
+			break
+		}
+		target = "/scorecards?grade=A&limit=1&cursor=" + next
+	}
+	if len(seen) != len(want) {
+		t.Fatalf("walked %v, want %v", seen, want)
 	}
 }

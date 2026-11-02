@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/claudioed/node-performance/internal/adapters/inbound/http/page"
 	"github.com/claudioed/node-performance/internal/application/usecases"
 	"github.com/claudioed/node-performance/internal/application/views"
-	"github.com/claudioed/node-performance/internal/domain/shared"
 )
 
 // The use-case contracts the handlers call. usecases.Queries satisfies both;
@@ -35,43 +33,48 @@ func (s *Server) handleGetScorecard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, nodeScorecardsDTO{NodeID: got.NodeID, Scorecards: scorecardsOf(got.Scorecards)})
 }
 
-// listParams are the query parameters of GET /scorecards.
-var listParams = map[string]bool{"grade": true, "window": true, "limit": true, "after": true}
+// listFilters are the filter query parameters of GET /scorecards; `limit` and
+// `cursor` are always declared (page.Unknown).
+var listFilters = []string{"grade", "window"}
 
-// handleListScorecards serves GET /scorecards?grade=&window=&limit=&after=.
-// An unknown parameter or a limit that is not an integer is a 400; a value the
-// domain refuses (grade, window, limit range, cursor) is a 422.
+// handleListScorecards serves GET /scorecards?grade=&window=&limit=&cursor=.
+// An undeclared parameter, a bad limit or an undecodable cursor is a 400; a
+// value the domain refuses (grade, window) is a 422.
 func (s *Server) handleListScorecards(w http.ResponseWriter, r *http.Request) {
-	in, err := listInput(r.URL.Query())
+	in, err := listInput(r)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	page, err := s.ListScorecards.ListScorecardsByGrade(r.Context(), in)
+	got, err := s.ListScorecards.ListScorecardsByGrade(r.Context(), in)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, scorecardListDTO{Items: scorecardsOf(page.Items), NextCursor: page.NextCursor})
+	out := scorecardListDTO{Items: scorecardsOf(got.Items)}
+	if got.NextCursor != "" {
+		// The keyset is the scorecardId, which is unique: it is its own sort key.
+		out.NextCursor = page.Encode(page.Position{Sort: got.NextCursor, ID: got.NextCursor})
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
-func listInput(q url.Values) (usecases.ListByGradeInput, error) {
-	for name := range q {
-		if !listParams[name] {
-			return usecases.ListByGradeInput{}, fmt.Errorf("%w: unknown query parameter %q", errMalformedRequest, name)
-		}
+func listInput(r *http.Request) (usecases.ListByGradeInput, error) {
+	if name := page.Unknown(r, listFilters...); name != "" {
+		return usecases.ListByGradeInput{}, detailError{fmt.Sprintf("query parameter %q is not declared by this operation", name), unknownQueryParameter}
 	}
-	in := usecases.ListByGradeInput{Grade: q.Get("grade"), Window: q.Get("window"), After: q.Get("after")}
-	if raw := q.Get("limit"); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil {
-			return usecases.ListByGradeInput{}, fmt.Errorf("%w: limit must be an integer", errMalformedRequest)
-		}
-		if n < 1 {
-			// 0 would read as "absent" in the use case; a present limit below 1 is refused.
-			return usecases.ListByGradeInput{}, shared.Invalid("limit must be between 1 and %d", usecases.MaxListLimit)
-		}
-		in.Limit = n
+	limit, err := page.Limit(r)
+	if err != nil {
+		return usecases.ListByGradeInput{}, detailError{err.Error(), invalidLimit}
+	}
+	pos, err := page.After(r)
+	if err != nil {
+		return usecases.ListByGradeInput{}, detailError{err.Error(), invalidCursor}
+	}
+	q := r.URL.Query()
+	in := usecases.ListByGradeInput{Grade: q.Get("grade"), Window: q.Get("window"), Limit: limit}
+	if pos != nil {
+		in.After = pos.ID
 	}
 	return in, nil
 }

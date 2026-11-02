@@ -213,7 +213,7 @@ Two read-only routes served by `cmd/api` on `:8080`:
 | Route | Use case |
 | --- | --- |
 | `GET /scorecards/{nodeId}` | both scorecards of a node |
-| `GET /scorecards?grade=&window=&limit=&after=` | scorecards by current grade, paginated (`limit` 1–500) |
+| `GET /scorecards?grade=&window=&limit=&cursor=` | scorecards by current grade, paginated (`limit` 1–500) |
 
 Both routes are read-only, so none takes an `Idempotency-Key`. Errors are RFC
 9457 problem details (`application/problem+json`): `not-found` (404) and

@@ -28,7 +28,7 @@ plus `/healthz` and `/readyz` (`internal/adapters/inbound/http/server.go`). See 
 | Tag | Endpoint | Operation id | Success |
 | --- | --- | --- | --- |
 | Scorecards | `GET /scorecards/{nodeId}` | `getScorecard` | `200`, `{nodeId, scorecards[]}` with the 7-day then the 30-day scorecard; `404 not-found` when no observation was ever recorded for the node |
-| Scorecards | `GET /scorecards` | `listScorecardsByGrade` | `200 {items, nextCursor?}`, ordered by `scorecardId` ascending; query `grade` (required), `window`, `limit` (1 to 500, default 100), `after`; `422 validation-failed` on a bad value |
+| Scorecards | `GET /scorecards` | `listScorecardsByGrade` | `200 {items, nextCursor?}`, ordered by `scorecardId` ascending; query `grade` (required), `window`, `limit` (1 to 500, default 100), `cursor`; `400 invalid-limit`, `invalid-cursor` or `unknown-query-parameter`; `422 validation-failed` on a bad value |
 | Health | `GET /healthz`, `GET /readyz` (not in the OpenAPI document) | n/a | `200`, or `503` from `/readyz` while draining or when Postgres or Kafka is down; see [Runbook](/docs/operations/runbook#health) |
 
 `/healthz` and `/readyz` are the only HTTP routes not described by `apis/openapi.yaml`; `/a2a` and
@@ -43,10 +43,12 @@ plus `/healthz` and `/readyz` (`internal/adapters/inbound/http/server.go`). See 
   `feedFreshnessP95Minutes` and `observations`, plus, when there is data, the informational
   `inboundTimelinessP95Minutes` and `inboundAccuracyRate`; `computedAt` is omitted before the first
   recompute. A metric with an empty denominator reports its best value.
-- **Paging.** `limit` 1 to 500 (default 100) and the opaque `after` (the previous page's
-  `nextCursor`, at most 80 characters); no `nextCursor` marks the last page.
+- **Paging.** `limit` 1 to 500 (default 100) and the opaque `cursor` (the previous page's
+  `nextCursor`); no `nextCursor` marks the last page. A parameter the operation does not declare
+  (a retired `after`, `offset`, `nextToken`) is `400 unknown-query-parameter` ([ADR 0012](/docs/adr/0012-adopt-the-fleet-rest-api-guideline)).
 - **Errors** are RFC 9457 `application/problem+json` with `type` equal to a bare slug (not a URL):
-  `not-found` (404), `validation-failed` (422), `malformed-request-query` and
+  `not-found` (404), `validation-failed` (422), `invalid-limit`, `invalid-cursor`, `unknown-query-parameter`,
+  `malformed-request-query` and
   `malformed-request-body` (400, a NUL character), `method-not-allowed` (405),
   `concurrent-update` (409), `dependency-unavailable` (503, `/readyz` only) and `internal-error`
   (500). The OpenAPI document lists `not-found` and `validation-failed`; the others come from the

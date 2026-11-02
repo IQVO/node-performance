@@ -14,10 +14,10 @@ const GRADE_OPTIONS = GRADES.map((g) => ({ value: g, label: g }));
 const WINDOW_OPTIONS = WINDOWS.map((w) => ({ value: w, label: w }));
 
 /**
- * The scorecards of one grade: GET /scorecards?grade=&window=&limit=&after=,
+ * The scorecards of one grade: GET /scorecards?grade=&window=&limit=&cursor=,
  * ordered by scorecardId ascending, one page at a time. The grade is required
  * by the contract (it defaults to A here); the window filter narrows the page
- * to one of the two windows. Paging follows the `after` keyset cursor; the
+ * to one of the two windows. Paging follows the `cursor` keyset cursor; the
  * cursors already visited are kept so "Previous" walks back without the API
  * having to support it.
  */
@@ -33,7 +33,7 @@ export function ScorecardListScreen() {
         grade: applied.grade,
         window: applied.window || undefined,
         limit: 25,
-        after: cursor || undefined,
+        cursor: cursor || undefined,
       }),
     `scorecards|${applied.grade}|${applied.window}|${cursor}`,
   );

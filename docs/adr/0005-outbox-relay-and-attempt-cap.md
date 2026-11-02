@@ -24,7 +24,7 @@ Postgres transaction. Something has to drain the rows to Kafka. The harness temp
    replicas never claim the same row), stops at the first send failure (a later event of a
    scorecard never overtakes an earlier one that is being retried), records `attempts` and
    `last_error` on the failed row, commits the rows already sent and returns an
-   `*outbox.SendFailure`. A cancelled context still commits what was sent. The write side
+   `*outbox.SendFailureError`. A cancelled context still commits what was sent. The write side
    (`postgres.OutboxRepo.Append`) encodes before it writes, so an event the encoder
    refuses rolls the whole unit of work back.
 3. **Delivery is at-least-once.** A crash between the send and the `UPDATE` republishes

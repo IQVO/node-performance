@@ -143,7 +143,7 @@ func (i Intake) apply(ctx context.Context, ref EventRef, run effect) (Outcome, e
 		return err
 	})
 	if errors.Is(err, shared.ErrValidation) {
-		return "", fmt.Errorf("%w: %v", ErrInvalidEvent, err)
+		return "", fmt.Errorf("%w: %w", ErrInvalidEvent, err)
 	}
 	if err != nil {
 		return "", err

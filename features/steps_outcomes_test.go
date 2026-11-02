@@ -31,7 +31,7 @@ func (w *world) commandFailsWith(name string) error {
 		return err
 	}
 	if !errors.Is(w.lastErr, want) {
-		return fmt.Errorf("the last command returned %v, want %v", w.lastErr, want)
+		return fmt.Errorf("the last command returned %w, want %w", w.lastErr, want)
 	}
 	return nil
 }

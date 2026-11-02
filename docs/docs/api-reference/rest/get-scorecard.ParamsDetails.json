@@ -1,1 +1,1 @@
-{"parameters":[{"name":"nodeId","in":"path","required":true,"description":"The node id minted by node-topology.","schema":{"type":"string","maxLength":64,"example":"N-0042"}}]}
+{"parameters":[{"name":"nodeId","in":"path","required":true,"description":"The node id minted by node-topology.","schema":{"type":"string","minLength":1,"maxLength":64,"pattern":"^[A-Za-z0-9][A-Za-z0-9._-]*$","example":"N-0042"}}]}

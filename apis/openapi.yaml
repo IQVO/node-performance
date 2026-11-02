@@ -65,7 +65,7 @@ paths:
         Lists every scorecard whose current grade is the one given, ordered by
         scorecardId ascending, one page at a time. The model names no window
         filter and no caller; the optional window filter and the keyset
-        pagination (limit, after) are additive (ADR 0002, A18).
+        pagination (limit, cursor) are additive (ADR 0002, A18; ADR 0012).
       parameters:
         - name: grade
           in: query
@@ -79,22 +79,8 @@ paths:
           description: Restrict the list to one window.
           schema:
             $ref: '#/components/schemas/Window'
-        - name: limit
-          in: query
-          required: false
-          description: Page size, 1 to 500; 100 when absent.
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 500
-            default: 100
-        - name: after
-          in: query
-          required: false
-          description: The nextCursor of the previous page (the last scorecardId returned).
-          schema:
-            type: string
-            maxLength: 80
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
           description: The matching scorecards.
@@ -102,8 +88,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScorecardList'
+        '400':
+          description: "invalid-limit, invalid-cursor, unknown-query-parameter or malformed-request-query."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: invalid-cursor
+                title: Invalid cursor
+                status: 400
+                detail: cursor is not a valid page token.
         '422':
-          description: "validation-failed (ErrValidation): grade, window or limit is not an accepted value."
+          description: "validation-failed (ErrValidation): grade or window is not an accepted value."
           content:
             application/problem+json:
               schema:
@@ -115,6 +112,23 @@ paths:
                 detail: grade must be one of A, B, C, D, PROVISIONAL.
 components:
   parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size, 1 to 500; 100 when absent.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque nextCursor of the previous page; filters are repeated on every page request.
+      schema:
+        type: string
     NodeId:
       name: nodeId
       in: path
@@ -278,7 +292,7 @@ components:
             $ref: '#/components/schemas/Scorecard'
         nextCursor:
           type: string
-          description: The `after` value of the next page; omitted on the last page.
+          description: Opaque cursor of the next page; omitted on the last page.
     Problem:
       type: object
       description: RFC 9457 problem details.

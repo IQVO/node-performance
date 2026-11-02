@@ -77,7 +77,9 @@ operating view in the [Runbook](/docs/operations/runbook), the log messages in
 | `404 not-found` on `GET /scorecards/{nodeId}` | No observation has ever been recorded for the node; a scorecard exists from the first observation. | Check `SELECT * FROM scorecards WHERE node_id = '...'` and whether the node's events reach the consumers. A node that only appears in `NodeRegistered` has no scorecard. |
 | `200 {"items":[]}` for `grade=A` | No scorecard currently has that grade, or fewer than 50 observations everywhere (all `PROVISIONAL`). | Query `grade=PROVISIONAL`. |
 | `422 validation-failed` `grade must be one of A, B, C, D, PROVISIONAL` | Bad `grade`. | Fix the query; `window` is `7d` or `30d`, `limit` 1 to 500. |
-| `422 validation-failed` `limit must be between 1 and 500` | `limit=0` or above 500. | Omit `limit` for the default of 100. |
+| `400 invalid-limit` | `limit` is empty, repeated, not an integer, 0 or above 500. | Omit `limit` for the default of 100. |
+| `400 invalid-cursor` | `cursor` is not a `nextCursor` this service issued. | Start again without `cursor`. |
+| `400 unknown-query-parameter` | A parameter the operation does not declare, e.g. the retired `after`. | Use `limit` and `cursor`. |
 | `400 malformed-request-query` | A NUL character in the query string. | Remove it. |
 | `405 method-not-allowed` | Anything but `GET`: the API has no write route. | Facts arrive only as CloudEvents on Kafka. |
 | `409 concurrent-update` | A version-guarded save lost a race (the problem type exists for completeness; reads do not raise it). | Retry. |

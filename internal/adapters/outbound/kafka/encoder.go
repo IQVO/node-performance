@@ -18,8 +18,9 @@ import (
 	"github.com/claudioed/node-performance/internal/domain/shared"
 )
 
-// The topics of this service. NodeScorecardUpdated goes ONLY to the
-// integration topic and NodeThresholdBreached ONLY to the analytics topic.
+// The topics of this service. NodeScorecardUpdated and
+// NodeTierEligibilityChanged go ONLY to the integration topic and
+// NodeThresholdBreached ONLY to the analytics topic.
 const (
 	EventsTopic    = "retailnetwork.node-performance.events"
 	AnalyticsTopic = "retailnetwork.node-performance.analytics"
@@ -52,6 +53,17 @@ type thresholdBreachedData struct {
 	Value     float64 `json:"value"`
 	Threshold float64 `json:"threshold"`
 	Window    string  `json:"window"`
+}
+
+type tierEligibilityChangedData struct {
+	NodeID    string  `json:"nodeId"`
+	Tier      string  `json:"tier"`
+	Eligible  bool    `json:"eligible"`
+	Metric    string  `json:"metric"`
+	Value     float64 `json:"value"`
+	Threshold float64 `json:"threshold"`
+	Window    string  `json:"window"`
+	ChangedAt string  `json:"changedAt"`
 }
 
 // Encoder implements outbox.Encoder: each domain event becomes one
@@ -115,6 +127,11 @@ func payloadFor(ev shared.Event) (any, error) {
 	case scorecard.NodeThresholdBreached:
 		return thresholdBreachedData{
 			NodeID: string(e.NodeID), Metric: string(e.Metric), Value: e.Value, Threshold: e.Threshold, Window: string(e.Window),
+		}, nil
+	case scorecard.NodeTierEligibilityChanged:
+		return tierEligibilityChangedData{
+			NodeID: string(e.NodeID), Tier: string(e.Tier), Eligible: e.Eligible, Metric: string(e.Metric),
+			Value: e.Value, Threshold: e.Threshold, Window: string(e.Window), ChangedAt: ts(e.ChangedAt),
 		}, nil
 	default:
 		return nil, fmt.Errorf("kafka encoder: %s is not a published event", ev.EventName())

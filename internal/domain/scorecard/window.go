@@ -31,7 +31,8 @@ var (
 type Window string
 
 const (
-	// Window7d is the 7-day window; it feeds alerts only (G20, E18).
+	// Window7d is the 7-day window; it feeds alerts and gates the fast tiers
+	// (G20, E18, ADR 0013).
 	Window7d Window = "7d"
 	// Window30d is the 30-day window; consumers decide on it (G20, E18).
 	Window30d Window = "30d"

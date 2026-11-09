@@ -33,6 +33,7 @@ appended to the outbox, so a relay retry republishes the same `id`.
 | Type | Topic | Raised when | `data` |
 | --- | --- | --- | --- |
 | `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated` | `retailnetwork.node-performance.events` | `Recompute` saved a scorecard whose state, grade or metrics changed (never `PROVISIONAL` to `PROVISIONAL`) | `nodeId`, `window`, `grade` (`A` to `D` or `PROVISIONAL`), `onTimeHandoverRate`, `lateAckRate`, `rejectRate`, `expiryRate`, `promiseKeptRate`, `feedFreshnessP95Minutes`, `observations`, `computedAt` |
+| `com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged` | `retailnetwork.node-performance.events` | `Recompute` saved the **7d** scorecard and the fast-tier eligibility flag flipped ([ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)); two events per flip, one per tier, same `changedAt`; none for the initial eligible state. `subject` = `nodeId:7d` | `nodeId`, `tier` (`SAME_DAY` or `NEXT_DAY`), `eligible`, `metric` (`onTimeHandoverRate`), `value`, `threshold` (0.90 on suspension, 0.95 on reinstatement), `window` (`7d`), `changedAt` |
 | `com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached` | `retailnetwork.node-performance.analytics` (analytics only) | a metric moved from the healthy to the unhealthy side of its bound between two `GRADED` recomputes; one event per metric | `nodeId`, `metric`, `value`, `threshold`, `window` |
 
 All fields are always present. Timestamps are RFC 3339 UTC. Example (the contract's example):
@@ -52,6 +53,30 @@ All fields are always present. Timestamps are RFC 3339 UTC. Example (the contrac
     "onTimeHandoverRate": 0.962, "lateAckRate": 0.021, "rejectRate": 0.012,
     "expiryRate": 0.004, "promiseKeptRate": 0.951, "feedFreshnessP95Minutes": 38,
     "observations": 1874, "computedAt": "2026-10-22T14:03:00Z"
+  }
+}
+```
+
+Fast-tier eligibility ([ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)): the
+7d scorecard suspends a node from `SAME_DAY` and `NEXT_DAY` when it is `GRADED` and
+`onTimeHandoverRate` is below 0.90, and reinstates it when `onTimeHandoverRate` is at or above 0.95
+on three consecutive distinct UTC days of recompute (a lower recompute resets the count). Every node
+starts eligible, a `PROVISIONAL` scorecard changes nothing, and the 30d scorecard is never evaluated.
+A consumer that never saw an event treats the node as eligible. Example of a suspension:
+
+```json
+{
+  "specversion": "1.0",
+  "id": "7d0c6a52-3f7e-4b8e-9a51-2a8f0c1d9e46",
+  "source": "/retailnetwork/node-performance",
+  "type": "com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged",
+  "subject": "node-0f3a91:7d",
+  "time": "2026-10-22T14:03:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "urn:retailnetwork:node-performance:events:NodeTierEligibilityChanged:v1",
+  "data": {
+    "nodeId": "node-0f3a91", "tier": "SAME_DAY", "eligible": false, "metric": "onTimeHandoverRate",
+    "value": 0.88, "threshold": 0.9, "window": "7d", "changedAt": "2026-10-22T14:03:00Z"
   }
 }
 ```

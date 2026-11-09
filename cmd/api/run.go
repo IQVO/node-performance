@@ -59,6 +59,11 @@ func run(ctx context.Context) error {
 		return err
 	}
 	ad.deps.Metrics = scorecardMetrics
+	ad.deps.Logger = logger
+	// The fast-tier gauge reads its count from the scorecards table at each collection (ADR 0013).
+	if err := telemetry.RegisterFastTierGauge(ad.deps.Scorecards.CountFastTierSuspended); err != nil {
+		return err
+	}
 
 	readiness := newReadiness(ad.pool.Ping, cfg.brokers)
 	handler, err := inboundhttp.NewRouter(buildServer(ad, readiness, logger, tel.serviceName))

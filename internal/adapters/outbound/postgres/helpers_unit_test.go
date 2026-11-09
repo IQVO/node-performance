@@ -148,7 +148,8 @@ func gradedColumns(computed *time.Time) []any {
 	}
 	return []any{"N-1", "30d", "GRADED", "A",
 		0.98, 0.01, 0.0, 0.0, 0.97, 240, 512,
-		at, true, int64(7)}
+		at, true, int64(7),
+		true, 2, time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC)}
 }
 
 func TestScanSnapshotGraded(t *testing.T) {
@@ -169,6 +170,10 @@ func TestScanSnapshotGraded(t *testing.T) {
 	if !snap.Dirty || snap.Version != 7 {
 		t.Fatalf("dirty/version = %v/%d, want true/7", snap.Dirty, snap.Version)
 	}
+	wantTier := scorecard.FastTierState{Suspended: true, Streak: 2, StreakDay: time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC)}
+	if snap.FastTier != wantTier {
+		t.Fatalf("fast tier = %+v, want %+v", snap.FastTier, wantTier)
+	}
 	wantMetrics := scorecard.Metrics{OnTimeHandoverRate: 0.98, LateAckRate: 0.01, PromiseKeptRate: 0.97, FeedFreshnessP95Minutes: 240, Observations: 512}
 	if snap.Metrics != wantMetrics {
 		t.Fatalf("metrics = %+v, want %+v", snap.Metrics, wantMetrics)
@@ -178,7 +183,8 @@ func TestScanSnapshotGraded(t *testing.T) {
 func TestScanSnapshotProvisionalNeverComputed(t *testing.T) {
 	snap, err := scanSnapshot(fakeRow{vals: []any{"N-2", "7d", "PROVISIONAL", "",
 		1.0, 0.0, 0.0, 0.0, 1.0, 0, 3,
-		nil, true, int64(3)}})
+		nil, true, int64(3),
+		false, 0, nil}})
 	if err != nil {
 		t.Fatalf("scanSnapshot: %v", err)
 	}
@@ -220,7 +226,7 @@ func (r *fakeRows) Err() error { return r.err }
 func TestScanViews(t *testing.T) {
 	rows := &fakeRows{rows: []fakeRow{
 		{vals: gradedColumns(nil)},
-		{vals: []any{"N-2", "7d", "PROVISIONAL", "", 1.0, 0.0, 0.0, 0.0, 1.0, 0, 2, nil, false, int64(2)}},
+		{vals: []any{"N-2", "7d", "PROVISIONAL", "", 1.0, 0.0, 0.0, 0.0, 1.0, 0, 2, nil, false, int64(2), false, 0, nil}},
 	}}
 	got, err := scanViews(rows)
 	if err != nil {

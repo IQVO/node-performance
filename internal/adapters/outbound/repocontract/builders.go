@@ -100,10 +100,12 @@ func SeedGraded(t testing.TB, f Fixture, node string, w scorecard.Window) *score
 
 // RaisedEvents returns the events of a scorecard that is graded and then
 // worsens past a threshold: NodeScorecardUpdated, NodeScorecardUpdated,
-// NodeThresholdBreached, in the order Recompute raised them.
+// NodeThresholdBreached, in the order Recompute raised them. It is a 30d
+// scorecard: the 7d one would also raise the two NodeTierEligibilityChanged of
+// the fast-tier suspension (ADR 0013).
 func RaisedEvents(t testing.TB) []shared.Event {
 	t.Helper()
-	s := NewScorecard(t, "node-9", scorecard.Window7d)
+	s := NewScorecard(t, "node-9", scorecard.Window30d)
 	for i := 1; i < scorecard.MinObservations; i++ {
 		noErr(t, s.RecordObservation(Handover(t, fmt.Sprintf("ok-%d", i), i)))
 	}

@@ -34,7 +34,7 @@ func TestTheRelayPublishesTheOutboxToKafkaOnTheRightTopics(t *testing.T) {
 	kafkatest.CreateTopic(t, kafka.EventsTopic)
 	kafkatest.CreateTopic(t, kafka.AnalyticsTopic)
 
-	events := repocontract.RaisedEvents(t) // Updated, Updated, Breached
+	events := append(repocontract.RaisedEvents(t), repocontract.TierEvents(t)...) // Updated, Updated, Breached, Tier, Tier
 	repo := postgres.NewOutboxRepo(pool, kafka.NewEncoder())
 	if err := repo.Append(ctx, events...); err != nil {
 		t.Fatal(err)
@@ -44,17 +44,15 @@ func TestTheRelayPublishesTheOutboxToKafkaOnTheRightTopics(t *testing.T) {
 	t.Cleanup(func() { _ = sink.Close() })
 	relay := outbox.NewOutboxRelay(postgres.NewRelayStore(pool), sink, slog.Default(), outbox.WithMaxAttempts(5))
 	n, err := relay.RelayOnce(ctx)
-	if err != nil || n != 3 {
+	if err != nil || n != 5 {
 		t.Fatalf("RelayOnce = %d, %v", n, err)
 	}
 
-	onEvents := kafkatest.ReadN(t, kafka.EventsTopic, 2, 30*time.Second)
+	onEvents := kafkatest.ReadN(t, kafka.EventsTopic, 4, 30*time.Second)
 	onAnalytics := kafkatest.ReadN(t, kafka.AnalyticsTopic, 1, 30*time.Second)
-	for _, m := range onEvents {
-		assertEnvelope(t, m, "com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated", "node-9:7d")
-	}
-	assertEnvelope(t, onAnalytics[0], "com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached", "node-9:7d")
-	if extra := kafkatest.CountAvailable(t, kafka.EventsTopic); extra != 2 {
+	assertIntegrationTopic(t, onEvents)
+	assertEnvelope(t, onAnalytics[0], "com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached", "node-9:30d")
+	if extra := kafkatest.CountAvailable(t, kafka.EventsTopic); extra != 4 {
 		t.Fatalf("the analytics-only event must not reach the integration topic: %d messages", extra)
 	}
 
@@ -65,6 +63,38 @@ func TestTheRelayPublishesTheOutboxToKafkaOnTheRightTopics(t *testing.T) {
 	again, err := relay.RelayOnce(ctx)
 	if err != nil || again != 0 {
 		t.Fatalf("a second pass has nothing to send: %d, %v", again, err)
+	}
+}
+
+// assertIntegrationTopic checks the four messages of the integration topic:
+// two NodeScorecardUpdated and the NodeTierEligibilityChanged of both tiers.
+func assertIntegrationTopic(t *testing.T, msgs []kafkatest.Message) {
+	t.Helper()
+	const typePrefix = "com.retailnetwork.partner.node-performance.scorecard."
+	tiers := map[string]bool{}
+	updated := 0
+	for _, m := range msgs {
+		ev, err := cloudevents.Decode(m.Value)
+		if err != nil {
+			t.Fatalf("not a CloudEvent: %v", err)
+		}
+		switch ev.Type() {
+		case typePrefix + "NodeScorecardUpdated":
+			assertEnvelope(t, m, typePrefix+"NodeScorecardUpdated", "node-9:30d")
+			updated++
+		case typePrefix + "NodeTierEligibilityChanged":
+			assertEnvelope(t, m, typePrefix+"NodeTierEligibilityChanged", "node-8:7d")
+			var data struct{ Tier string }
+			if err := ev.DataAs(&data); err != nil {
+				t.Fatal(err)
+			}
+			tiers[data.Tier] = true
+		default:
+			t.Fatalf("unexpected type %s on the integration topic", ev.Type())
+		}
+	}
+	if updated != 2 || !tiers["SAME_DAY"] || !tiers["NEXT_DAY"] {
+		t.Fatalf("updated %d, tiers %v; want 2 and both tiers", updated, tiers)
 	}
 }
 

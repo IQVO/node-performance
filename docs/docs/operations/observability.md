@@ -33,6 +33,7 @@ baggage. The chart renders the first four from `otel.*`, `image.tag` and `enviro
 | Instrument | Type | Unit | Attributes | Source |
 | --- | --- | --- | --- | --- |
 | `nodeperformance.scorecards.recomputed` (Prometheus: `nodeperformance_scorecards_recomputed_total`) | Int64 counter | `{scorecard}` | `outcome` = `recomputed` \| `failed`; `reason` on failures = `concurrent-update` \| `internal-error` | `internal/adapters/outbound/telemetry/scorecard_metrics.go`, recorded by `Recompute.Run` (`internal/application/usecases/recompute.go`) in the `api` process only |
+| `nodeperf.fast_tier.ineligible_nodes` (Prometheus: `nodeperf_fast_tier_ineligible_nodes`) | Int64 observable gauge | `{node}` | none | `internal/adapters/outbound/telemetry/fast_tier_gauge.go`; counts the 7d scorecards suspended from the fast tiers ([ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)) with one query at each collection, in the `api` process only |
 | `http.server.request.duration` | Float64 histogram | `s` | route pattern, method, status class (otelchi metric) | `otelchimetric.NewServerRequestDuration` in the REST, MCP and A2A routers |
 | Go runtime metrics (goroutines, memory, GC) | gauges / counters | n/a | none | `go.opentelemetry.io/contrib/instrumentation/runtime` v0.72.0, started by `telemetry.Setup`; instrument names depend on that library's naming mode, the dashboard queries accept both `go_goroutine_count` and `runtime_go_goroutines` |
 
@@ -41,6 +42,12 @@ while nodes keep reporting means grading has stalled and published grades are go
 rising `concurrent-update` means writers contend for the same scorecards but the next run
 retries them; a rising `internal-error` means the service itself, usually its database, is
 failing. A scorecard that vanished or was no longer due is not counted as an attempt.
+
+The gauge rises when nodes lose the `SAME_DAY` and `NEXT_DAY` tiers and falls when they are
+reinstated; one that stays high while the nodes keep delivering on time means reinstatement is stuck
+(check the recompute scheduler). A failed count skips the data point and logs a warning instead of
+reporting a zero. Each flip is also logged at INFO as `fast tier eligibility changed` with `node_id`,
+`eligible`, `metric`, `value`, `threshold` and `window`.
 
 There is no consumer-lag, outbox-backlog or DLQ instrument. Use the SQL and log signals in the
 [Runbook](/docs/operations/runbook#outbox-relay) for those.

@@ -13,6 +13,8 @@ Feature: Threshold alerts
       | node-1:30d | NodeThresholdBreached |
       | node-1:7d  | NodeScorecardUpdated  |
       | node-1:7d  | NodeThresholdBreached |
+      | node-1:7d  | NodeTierEligibilityChanged |
+      | node-1:7d  | NodeTierEligibilityChanged |
 
   Scenario: A metric that is still healthy raises no alert
     Given node "node-1" has 50 on-time handovers and 0 late handovers
@@ -41,6 +43,8 @@ Feature: Threshold alerts
     And the events published were:
       | node-1:30d | NodeScorecardUpdated |
       | node-1:7d  | NodeScorecardUpdated |
+      | node-1:7d  | NodeTierEligibilityChanged |
+      | node-1:7d  | NodeTierEligibilityChanged |
 
   Scenario: A metric where lower is better alerts when it rises above its threshold
     Given node "node-1" has 100 purchase orders accepted early, 0 accepted late, 0 rejected and 0 expired

@@ -40,6 +40,7 @@ packaged: a Helm chart (`charts/node-performance`) and a console remote (`web/`,
 | **NodeScorecard** (two per node, `7d` and `30d`) | `internal/domain/scorecard` | State `PROVISIONAL` or `GRADED`, grade `A` to `D`, metrics, observations; saved with a version guard ([ADR 0002](/docs/adr/0002-aggregates-and-invariants)). |
 | **Observation** | `internal/domain/scorecard/observation.go` | One measured fact keyed by the CloudEvents id of its source event; kinds `ACK_ACCEPTED`, `ACK_REJECTED`, `ACK_EXPIRED`, `HANDOVER`, `PROMISE_KEPT`, `PROMISE_BROKEN`, `FEED_APPLIED`. A source id counts once. |
 | **Grading policy** | `internal/domain/scorecard/grade.go` | `A`: on-time ≥ 0.98, promise-kept ≥ 0.97, late-ack ≤ 0.01; `B`: 0.95 / 0.94 / 0.03; `C`: 0.90 / 0.90 / 0.05; otherwise `D`. Never below 50 observations. |
+| **Fast-tier eligibility** | `internal/domain/scorecard/eligibility.go` | The 7d scorecard suspends a node from `SAME_DAY` and `NEXT_DAY` below 0.90 on-time handover and reinstates it at 0.95 on three distinct UTC days; published as `NodeTierEligibilityChanged` ([ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)). |
 | **Threshold alert** | same file | Six bounds (on-time ≥ 0.90, promise-kept ≥ 0.90, late-ack ≤ 0.05, reject ≤ 0.10, expiry ≤ 0.05, feed freshness p95 ≤ 240 min); a downward crossing between two graded states raises `NodeThresholdBreached`. |
 | **PurchaseOrderFacts** | `purchase_order_facts` table | Local copy of `issuedAt`, `ackBy` and `requiredShipBy` per purchase order, needed to judge acknowledgements and handovers ([ADR 0003](/docs/adr/0003-consumed-contracts-and-local-facts)). Not aggregate state. |
 | **Inbound shipments and receipts** | `inbound_shipments`, `inbound_receipts` | Joined by `shipmentId` into two informational metrics, `inboundTimelinessP95Minutes` and `inboundAccuracyRate`, shown on reads and never graded ([ADR 0009](/docs/adr/0009-inbound-timeliness-and-accuracy-metrics)). |
@@ -78,7 +79,8 @@ packaged: a Helm chart (`charts/node-performance`) and a console remote (`web/`,
 3. Recompute the due scorecards every minute: drop observations that left the window, recompute
    six metrics, grade, and detect threshold crossings
    ([Use cases](/docs/ddd/use-cases)).
-4. Publish `NodeScorecardUpdated` (topic `retailnetwork.node-performance.events`) and
+4. Publish `NodeScorecardUpdated` and `NodeTierEligibilityChanged` (topic
+   `retailnetwork.node-performance.events`) and
    `NodeThresholdBreached` (topic `retailnetwork.node-performance.analytics`) through a
    transactional outbox with an attempt cap ([Event catalogue](/docs/api-reference/events)).
 5. Serve the scorecards read-only over REST (`GET /scorecards/{nodeId}`,

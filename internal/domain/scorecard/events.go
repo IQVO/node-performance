@@ -59,3 +59,34 @@ func (e NodeThresholdBreached) SubjectID() string { return ScorecardID(e.NodeID,
 
 // AnalyticsOnly is true: the model has no in-organization consumer.
 func (NodeThresholdBreached) AnalyticsOnly() bool { return true }
+
+// NodeTierEligibilityChanged is raised by Recompute of the 7d scorecard when
+// the FastTierEligibility flag flips (ADR 0013): two events per flip, one per
+// governed tier, with the same ChangedAt. Integration event, topic .events.
+type NodeTierEligibilityChanged struct {
+	shared.Header
+	NodeID NodeID
+	Tier   Tier
+	// Eligible is the state the node moved to.
+	Eligible bool
+	// Metric, Value and Threshold name the rate that caused the change and the
+	// bound it crossed (0.90 on suspension, 0.95 on reinstatement).
+	Metric    MetricName
+	Value     float64
+	Threshold float64
+	Window    Window
+	// ChangedAt is the recompute instant.
+	ChangedAt time.Time
+}
+
+// EventName returns "NodeTierEligibilityChanged".
+func (NodeTierEligibilityChanged) EventName() string { return "NodeTierEligibilityChanged" }
+
+// Entity returns "scorecard".
+func (NodeTierEligibilityChanged) Entity() string { return EntityScorecard }
+
+// SubjectID returns the scorecardId.
+func (e NodeTierEligibilityChanged) SubjectID() string { return ScorecardID(e.NodeID, e.Window) }
+
+// AnalyticsOnly is false: delivery-promise acts on this event.
+func (NodeTierEligibilityChanged) AnalyticsOnly() bool { return false }

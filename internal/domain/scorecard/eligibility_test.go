@@ -153,3 +153,21 @@ func TestFastTierTheWindowOfThirtyDaysNeverEvaluatesThePolicy(t *testing.T) {
 		t.Fatalf("only the 7d scorecard gates the fast tiers: %+v", events)
 	}
 }
+
+func TestFastTierExactlyNinetyFivePercentCountsAsADay(t *testing.T) {
+	list := append(handovers("ok", 95, true, midday(0).Add(-2*time.Hour)), handovers("late", 5, false, midday(0).Add(-time.Hour))...)
+	s, err := Restore(Snapshot{
+		NodeID: "node-0f3a91", Window: Window7d, State: StateProvisional, Metrics: EmptyMetrics(), Version: 1,
+		FastTier: FastTierState{Suspended: true}, Observations: list,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tiers []NodeTierEligibilityChanged
+	for day := 0; day < reinstateAfterDays; day++ {
+		tiers = tierEvents(s.Recompute(midday(day)))
+	}
+	if rate := s.Metrics().OnTimeHandoverRate; rate != reinstateAt || len(tiers) != 2 || !tiers[0].Eligible || tiers[0].Value != reinstateAt {
+		t.Fatalf("rate %v: the bar itself reinstates on the third day: %+v", rate, tiers)
+	}
+}

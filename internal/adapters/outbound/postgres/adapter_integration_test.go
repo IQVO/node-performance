@@ -229,7 +229,7 @@ func TestTheOutboxStoresTheEncodedMessage(t *testing.T) {
 	noErr(t, pool.QueryRow(context.Background(), `SELECT event_type, topic, subject, dataschema, headers::text, key, value, attempts, published_at::text
 		FROM outbox_events ORDER BY id LIMIT 1`).Scan(&eventType, &topic, &subject, &dataschema, &headers, &key, &value, &attempts, &published))
 	if eventType != "com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated" || topic != eventsTopic ||
-		subject != "node-9:7d" || string(key) != "node-9:7d" || attempts != 0 || published != nil {
+		subject != "node-9:30d" || string(key) != "node-9:30d" || attempts != 0 || published != nil {
 		t.Fatalf("row = %s %s %s %s attempts %d published %v", eventType, topic, subject, key, attempts, published)
 	}
 	if dataschema != "urn:retailnetwork:node-performance:events:NodeScorecardUpdated:v1" {
@@ -242,7 +242,7 @@ func TestTheOutboxStoresTheEncodedMessage(t *testing.T) {
 	}
 	var ce map[string]any
 	noErr(t, json.Unmarshal(value, &ce))
-	if ce["specversion"] != "1.0" || ce["subject"] != "node-9:7d" {
+	if ce["specversion"] != "1.0" || ce["subject"] != "node-9:30d" {
 		t.Fatalf("value = %s", value)
 	}
 	if n := count(t, pool, "outbox_events"); n != len(events) {

@@ -46,4 +46,5 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerReadSteps(sc, w)
 	registerEventPayloadSteps(sc, w)
 	registerInboundSteps(sc, w)
+	registerTierSteps(sc, w)
 }

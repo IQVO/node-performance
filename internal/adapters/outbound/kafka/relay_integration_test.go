@@ -51,9 +51,9 @@ func TestTheRelayPublishesTheOutboxToKafkaOnTheRightTopics(t *testing.T) {
 	onEvents := kafkatest.ReadN(t, kafka.EventsTopic, 2, 30*time.Second)
 	onAnalytics := kafkatest.ReadN(t, kafka.AnalyticsTopic, 1, 30*time.Second)
 	for _, m := range onEvents {
-		assertEnvelope(t, m, "com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated", "node-9:7d")
+		assertEnvelope(t, m, "com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated", "node-9:30d")
 	}
-	assertEnvelope(t, onAnalytics[0], "com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached", "node-9:7d")
+	assertEnvelope(t, onAnalytics[0], "com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached", "node-9:30d")
 	if extra := kafkatest.CountAvailable(t, kafka.EventsTopic); extra != 2 {
 		t.Fatalf("the analytics-only event must not reach the integration topic: %d messages", extra)
 	}

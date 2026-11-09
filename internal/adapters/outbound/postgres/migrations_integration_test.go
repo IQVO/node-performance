@@ -20,7 +20,7 @@ var allTables = []string{
 }
 
 // coreTables are the tables of migration 0001; 0002 adds the next three and
-// 0003 the two inbound read models.
+// 0003 the two inbound read models. 0004 adds columns to scorecards, no table.
 var coreTables = []string{"purchase_order_facts", "scorecard_observations", "scorecards"}
 
 // withoutInbound is every table before migration 0003.
@@ -54,6 +54,32 @@ func wantTables(t *testing.T, pool *pgxpool.Pool, want []string) {
 	}
 }
 
+// fastTierColumns are the columns migration 0004 adds to scorecards (ADR 0013).
+var fastTierColumns = []string{"fast_tier_reinstate_day", "fast_tier_reinstate_streak", "fast_tier_suspended"}
+
+func wantFastTierColumns(t *testing.T, pool *pgxpool.Pool, want []string) {
+	t.Helper()
+	rows, err := pool.Query(context.Background(), `
+		SELECT column_name FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'scorecards' AND column_name LIKE 'fast_tier_%'
+		ORDER BY column_name COLLATE "C"`)
+	if err != nil {
+		t.Fatalf("list columns: %v", err)
+	}
+	defer rows.Close()
+	got := []string{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, name)
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("fast tier columns = %v, want %v", got, want)
+	}
+}
+
 func migrator(t *testing.T, url string) *migrate.Migrate {
 	t.Helper()
 	m, err := postgres.NewMigrator(url)
@@ -72,6 +98,11 @@ func TestMigrationsUpDownUp(t *testing.T) {
 	m := migrator(t, url)
 	noErr(t, m.Up())
 	wantTables(t, pool, allTables)
+	wantFastTierColumns(t, pool, fastTierColumns)
+
+	noErr(t, m.Steps(-1)) // down 0004: columns only
+	wantTables(t, pool, allTables)
+	wantFastTierColumns(t, pool, []string{})
 
 	noErr(t, m.Steps(-1)) // down 0003
 	wantTables(t, pool, withoutInbound)
@@ -84,6 +115,7 @@ func TestMigrationsUpDownUp(t *testing.T) {
 
 	noErr(t, m.Up())
 	wantTables(t, pool, allTables)
+	wantFastTierColumns(t, pool, fastTierColumns)
 }
 
 func TestRunMigrationsTwiceIsANoOp(t *testing.T) {

@@ -23,14 +23,16 @@ info:
     against requiredShipBy, promise-kept rate, inventory feed freshness) over
     7-day and 30-day rolling windows and grades the node (ADR 0001, ADR 0002).
 
-    **Published.** Two events through a **transactional outbox**: the scorecard
+    **Published.** Three events through a **transactional outbox**: the scorecard
     row and its already-encoded events are written in ONE database transaction
     and an always-on relay drains them to Kafka (at-least-once; the CloudEvents
     `id` is stored with the outbox row, so a retry republishes the same `id`).
     `NodeScorecardUpdated` is an integration event on
     `retailnetwork.node-performance.events` (consumers: delivery-promise,
-    order-sourcing). `NodeThresholdBreached` is analytics-only and goes ONLY to
-    `retailnetwork.node-performance.analytics`. Both types are catalogued in
+    order-sourcing). `NodeTierEligibilityChanged` is an integration event on the
+    same topic: the fast-tier eligibility gate of the 7d scorecard (ADR 0013).
+    `NodeThresholdBreached` is analytics-only and goes ONLY to
+    `retailnetwork.node-performance.analytics`. All three types are catalogued in
     ADR 0004.
 
     **Consumed.** Fifteen event types from six producers (six consumers), each topic under its own stable
@@ -77,6 +79,8 @@ channels:
     messages:
       NodeScorecardUpdated:
         $ref: "#/components/messages/NodeScorecardUpdated"
+      NodeTierEligibilityChanged:
+        $ref: "#/components/messages/NodeTierEligibilityChanged"
   nodePerformanceAnalytics:
     address: retailnetwork.node-performance.analytics
     title: node-performance analytics topic
@@ -176,19 +180,23 @@ operations:
   publishNodePerformanceEvents:
     action: send
     title: Publish node-performance integration events
-    summary: Publish NodeScorecardUpdated through the transactional outbox.
+    summary: Publish NodeScorecardUpdated and NodeTierEligibilityChanged through the transactional outbox.
     description: |
       After a Recompute is saved with a changed grade, state or metrics (and
       not while the scorecard stays PROVISIONAL), the service sends one
       NodeScorecardUpdated per scorecard to `retailnetwork.node-performance.events`.
       delivery-promise and order-sourcing consume it; only the 30d window feeds
-      their decisions, the 7d window feeds alerts only (E18).
+      their decisions; the 7d window feeds alerts and gates the fast tiers (E18,
+      ADR 0013): when the fast-tier eligibility flag of a node flips, a Recompute
+      of its 7d scorecard sends one NodeTierEligibilityChanged per tier
+      (SAME_DAY and NEXT_DAY) in the same transaction as the scorecard save.
     tags:
       - name: node-performance
     channel:
       $ref: "#/channels/nodePerformanceEvents"
     messages:
       - $ref: "#/channels/nodePerformanceEvents/messages/NodeScorecardUpdated"
+      - $ref: "#/channels/nodePerformanceEvents/messages/NodeTierEligibilityChanged"
   publishNodePerformanceAnalytics:
     action: send
     title: Publish node-performance analytics events
@@ -310,7 +318,7 @@ components:
       name: NodeScorecardUpdated
       title: Node scorecard updated
       summary: A node scorecard was recomputed and its grade, state or metrics changed.
-      description: "`type` = `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated`; subject and key = the scorecardId (`nodeId:window`). Raised by Recompute once the scorecard is saved, and not while a scorecard stays PROVISIONAL. `grade` is `PROVISIONAL` below minObservations (50) and also when a GRADED scorecard falls back below it. Consumers use the 30d window; PROVISIONAL adds no handicap (G20, E18). Metric definitions are in ADR 0002 (A5-A10)."
+      description: "`type` = `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated`; subject and key = the scorecardId (`nodeId:window`). Raised by Recompute once the scorecard is saved, and not while a scorecard stays PROVISIONAL. `grade` is `PROVISIONAL` below minObservations (50) and also when a GRADED scorecard falls back below it. Consumers use the 30d window; the 7d window gates the fast tiers through NodeTierEligibilityChanged (ADR 0013); PROVISIONAL adds no handicap (G20, E18). Metric definitions are in ADR 0002 (A5-A10)."
       contentType: application/cloudevents+json
       tags:
         - name: scorecard
@@ -368,6 +376,37 @@ components:
               value: 0.88
               threshold: 0.9
               window: 7d
+    NodeTierEligibilityChanged:
+      name: NodeTierEligibilityChanged
+      title: Node tier eligibility changed
+      summary: A node was suspended from, or reinstated to, the SAME_DAY and NEXT_DAY tiers.
+      description: "`type` = `com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged`; subject and key = the scorecardId of the 7d scorecard (`nodeId:7d`). Integration event: published to `retailnetwork.node-performance.events`, dataschema stream `events`. Raised by Recompute of the 7d scorecard (policy FastTierEligibility, ADR 0013) only when the eligibility flag FLIPS, two events per flip (one per tier, the same `changedAt`), in the same transaction as the scorecard save. Every node starts ELIGIBLE and the initial state publishes nothing. Suspension: the GRADED 7d `onTimeHandoverRate` fell below 0.90 (`threshold` 0.90, `eligible` false). Reinstatement: the GRADED 7d `onTimeHandoverRate` stood at or above 0.95 (`threshold` 0.95, `eligible` true) on three consecutive distinct UTC days of recompute. `value` is the rate that caused the change. A consumer that never saw an event treats the node as eligible."
+      contentType: application/cloudevents+json
+      tags:
+        - name: scorecard
+      payload:
+        $ref: "#/components/schemas/NodeTierEligibilityChangedEvent"
+      examples:
+        - name: nodeTierEligibilityChanged
+          summary: A node was suspended from the SAME_DAY tier.
+          payload:
+            specversion: "1.0"
+            id: "7d0c6a52-3f7e-4b8e-9a51-2a8f0c1d9e46"
+            source: "/retailnetwork/node-performance"
+            type: "com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged"
+            subject: "node-0f3a91:7d"
+            time: "2026-10-22T14:03:00Z"
+            datacontenttype: "application/json"
+            dataschema: "urn:retailnetwork:node-performance:events:NodeTierEligibilityChanged:v1"
+            data:
+              nodeId: "node-0f3a91"
+              tier: SAME_DAY
+              eligible: false
+              metric: onTimeHandoverRate
+              value: 0.88
+              threshold: 0.9
+              window: 7d
+              changedAt: "2026-10-22T14:03:00Z"
     VendorOnboarded:
       name: VendorOnboarded
       title: Vendor onboarded
@@ -876,6 +915,25 @@ components:
                 value: { type: number, minimum: 0 }
                 threshold: { type: number, minimum: 0 }
                 window: { $ref: "#/components/schemas/ScorecardWindow" }
+
+    NodeTierEligibilityChangedEvent:
+      allOf:
+        - $ref: "#/components/schemas/CloudEventEnvelope"
+        - type: object
+          properties:
+            source: { const: /retailnetwork/node-performance }
+            data:
+              type: object
+              required: [nodeId, tier, eligible, metric, value, threshold, window, changedAt]
+              properties:
+                nodeId: { type: string }
+                tier: { type: string, enum: [SAME_DAY, NEXT_DAY] }
+                eligible: { type: boolean }
+                metric: { type: string, const: onTimeHandoverRate }
+                value: { type: number, minimum: 0, maximum: 1 }
+                threshold: { type: number, enum: [0.9, 0.95] }
+                window: { type: string, const: 7d }
+                changedAt: { type: string, format: date-time }
 
     VendorOnboardedEvent:
       allOf:

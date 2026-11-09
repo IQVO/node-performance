@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/claudioed/node-performance/internal/domain/scorecard"
+	"github.com/claudioed/node-performance/internal/domain/shared"
 )
 
 // tierDay is the UTC day of a streak (a DATE column keeps no time of day).
@@ -16,6 +17,34 @@ var tierDay = time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC)
 // version 1: GRADED with 50 of 60 handovers on time, suspended from the fast
 // tiers with no streak.
 func suspendedSnapshot(t testing.TB, node string) scorecard.Snapshot {
+	t.Helper()
+	s, _ := suspendedScorecard(t, node)
+	snap := s.Snapshot()
+	snap.Version = 1
+	return snap
+}
+
+// TierEvents returns the two NodeTierEligibilityChanged (SAME_DAY, NEXT_DAY)
+// that Recompute raises when the 7d scorecard of node-8 is suspended from the
+// fast tiers.
+func TierEvents(t testing.TB) []shared.Event {
+	t.Helper()
+	_, events := suspendedScorecard(t, "node-8")
+	var out []shared.Event
+	for _, e := range events {
+		if e.EventName() == "NodeTierEligibilityChanged" {
+			out = append(out, e)
+		}
+	}
+	if len(out) != 2 {
+		t.Fatalf("the fixture must raise 2 tier events, got %d", len(out))
+	}
+	return out
+}
+
+// suspendedScorecard recomputes a 7d scorecard of 50 on-time and 10 late
+// handovers: GRADED, suspended from the fast tiers, with the events raised.
+func suspendedScorecard(t testing.TB, node string) (*scorecard.NodeScorecard, []shared.Event) {
 	t.Helper()
 	s := NewScorecard(t, node, scorecard.Window7d)
 	for i := 1; i < 60; i++ {
@@ -27,10 +56,7 @@ func suspendedSnapshot(t testing.TB, node string) scorecard.Snapshot {
 		}
 		noErr(t, s.RecordObservation(o))
 	}
-	s.Recompute(At(120))
-	snap := s.Snapshot()
-	snap.Version = 1
-	return snap
+	return s, s.Recompute(At(120))
 }
 
 // restoreAndSave restores the snapshot and stores it as a new scorecard.

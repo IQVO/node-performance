@@ -10,6 +10,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/claudioed/node-performance/internal/application/ports"
@@ -31,6 +32,17 @@ type Deps struct {
 	// Metrics records the business outcome of each recompute; nil records
 	// nothing, so unit tests need no wiring.
 	Metrics ports.ScorecardMetrics
+	// Logger receives the INFO line of each fast-tier eligibility flip; nil
+	// logs through slog.Default.
+	Logger *slog.Logger
+}
+
+// logger returns the configured Logger or the default one.
+func (d Deps) logger() *slog.Logger {
+	if d.Logger != nil {
+		return d.Logger
+	}
+	return slog.Default()
 }
 
 // metrics returns the configured ScorecardMetrics or a no-op.

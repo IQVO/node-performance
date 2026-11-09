@@ -7,7 +7,7 @@ paths:
 
 # Cross-service integration events (Kafka)
 
-node-performance PUBLISHES two events (`NodeScorecardUpdated` to
+node-performance PUBLISHES three events (`NodeScorecardUpdated` and `NodeTierEligibilityChanged` to
 `retailnetwork.node-performance.events`, `NodeThresholdBreached` to
 `retailnetwork.node-performance.analytics`) and CONSUMES thirteen event types from
 five producers (ADR 0003). Never produce or consume a `warehouse.*` topic.
@@ -50,6 +50,7 @@ content mode. This is a hard rule, not a preference:
 | `type` | stream / topic | `subject` |
 | --- | --- | --- |
 | `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated` | events / `retailnetwork.node-performance.events` | scorecardId |
+| `com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged` | events / `retailnetwork.node-performance.events` (subject `nodeId:7d`; two per flip, ADR 0013) | scorecardId |
 | `com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached` | analytics / `retailnetwork.node-performance.analytics` (analytics only: never on the events topic) | scorecardId |
 
 ### Consumed types (dispatch on the FULL `type`; handlers in `internal/adapters/inbound/kafka/handlers.go`)

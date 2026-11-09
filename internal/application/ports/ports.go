@@ -33,6 +33,9 @@ type ScorecardRepository interface {
 	// ListDue returns the ids of at most limit scorecards due for a recompute
 	// at now (scorecard.DueForRecompute), ordered by id ascending.
 	ListDue(ctx context.Context, now time.Time, limit int) ([]string, error)
+	// CountFastTierSuspended returns how many nodes are suspended from the fast
+	// tiers (ADR 0013): the stored 7d scorecards whose FastTier is suspended.
+	CountFastTierSuspended(ctx context.Context) (int, error)
 }
 
 // ScorecardReader is the read side of the two REST queries. It returns views

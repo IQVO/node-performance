@@ -34,8 +34,9 @@ in ADR 0003, not here.
 
 ### Published types
 
-`NodeScorecardUpdated` is an integration event and goes ONLY to
-`retailnetwork.node-performance.events`. `NodeThresholdBreached` has no
+`NodeScorecardUpdated` and `NodeTierEligibilityChanged` (added by ADR 0013) are
+integration events and go ONLY to `retailnetwork.node-performance.events`.
+`NodeThresholdBreached` has no
 in-organization consumer ("analytics only" in the model) and goes ONLY to
 `retailnetwork.node-performance.analytics` (conventions.analytics_rule; contracts-delta
 shared conventions), under the dataschema stream `analytics`.
@@ -43,20 +44,23 @@ shared conventions), under the dataschema stream `analytics`.
 ```text
 type: com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated stream: events
 type: com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached stream: analytics
+type: com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged stream: events
 ```
 
 | Event | Subject / key | Raised when | `data` |
 |---|---|---|---|
 | `NodeScorecardUpdated` | `scorecardId` | a Recompute is saved and the state, grade or metrics changed, except while the scorecard stays PROVISIONAL | `{nodeId, window, grade, onTimeHandoverRate, lateAckRate, rejectRate, expiryRate, promiseKeptRate, feedFreshnessP95Minutes, observations, computedAt}` |
 | `NodeThresholdBreached` | `scorecardId` | a Recompute between two GRADED states is saved in which a metric moved to the unhealthy side of its alert threshold (one event per metric) | `{nodeId, metric, value, threshold, window}` |
+| `NodeTierEligibilityChanged` | `scorecardId` (`nodeId:7d`) | a Recompute of the 7d scorecard is saved in which the fast-tier eligibility flag flipped (suspension below 0.90, reinstatement at 0.95 on three days, ADR 0013); two events per flip, one per tier, same `changedAt`; never for the initial ELIGIBLE state | `{nodeId, tier, eligible, metric, value, threshold, window, changedAt}` |
 
 Payload rules:
 
 - The `data` field lists are exactly the model's `publishes[].data` lists; the
   wire types are recorded in `apis/asyncapi.yaml` (ADR 0002, A12).
 - `window` is `7d` or `30d`; `grade` is `A`, `B`, `C`, `D` or `PROVISIONAL`
-  (adds no handicap, G20); consumers use the 30d window, the 7d window feeds
-  alerts only (E18).
+  (adds no handicap, G20); consumers use the 30d window for grades; the 7d
+  window feeds alerts and, through `NodeTierEligibilityChanged`, the fast-tier
+  eligibility gate (E18, ADR 0013).
 - `feedFreshnessP95Minutes` and `observations` are integers; the five rates are
   numbers in [0,1].
 - A breaking payload change is a new `.v2` type and dataschema, never a

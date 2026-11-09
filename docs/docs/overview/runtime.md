@@ -81,7 +81,7 @@ must exceed it.
   skipped.
 - The scheduler runs `Recompute` once at boot and then every `RECOMPUTE_INTERVAL`: it
   loads the scorecards that are due (an observation was recorded since the last recompute,
-  or one has left the window), recomputes them and appends `NodeScorecardUpdated` / `NodeThresholdBreached` to
+  or one has left the window), recomputes them and appends `NodeScorecardUpdated` / `NodeThresholdBreached` / `NodeTierEligibilityChanged` to
   the outbox in the same transaction. A failed round is logged and retried at the next tick.
 
 ## The outbox in operation

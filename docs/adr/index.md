@@ -26,3 +26,4 @@ The *Status* column is copied from each ADR's own `## Status` section.
 | [0010](./0010-fleet-observability-standard.md) | Adopt the fleet observability standard (logs, metrics, traces) | Accepted (2026-10-26) |
 | [0011](./0011-a2a-inbound-adapter.md) | A2A inbound adapter: a read-only Agent2Agent agent, two skills | Accepted (2026-10-30) |
 | [0012](./0012-adopt-the-fleet-rest-api-guideline.md) | Adopt the fleet REST API guideline | Accepted (2026-11-01) |
+| [0013](./0013-fast-tier-eligibility-from-the-7-day-window.md) | fast-tier eligibility from the 7-day window | Accepted (2026-11-09) |

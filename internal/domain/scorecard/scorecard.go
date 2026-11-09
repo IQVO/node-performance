@@ -19,6 +19,7 @@ type NodeScorecard struct {
 	computedAt   time.Time
 	dirty        bool
 	version      int64
+	fastTier     FastTierState
 	observations map[string]Observation
 }
 
@@ -32,8 +33,11 @@ type Snapshot struct {
 	// ComputedAt is zero until the first Recompute.
 	ComputedAt time.Time
 	// Dirty is true while observations were recorded since the last Recompute.
-	Dirty        bool
-	Version      int64
+	Dirty   bool
+	Version int64
+	// FastTier is the FastTierEligibility state; the zero value is ELIGIBLE
+	// (ADR 0013). Only the 7d scorecard can leave it.
+	FastTier     FastTierState
 	Observations []Observation
 }
 
@@ -70,7 +74,8 @@ func build(s Snapshot, restoring bool) (*NodeScorecard, error) {
 	}
 	return &NodeScorecard{
 		nodeID: s.NodeID, window: s.Window, state: s.State, grade: s.Grade, metrics: s.Metrics,
-		computedAt: shared.Instant(s.ComputedAt), dirty: s.Dirty, version: s.Version, observations: obs,
+		computedAt: shared.Instant(s.ComputedAt), dirty: s.Dirty, version: s.Version, fastTier: s.FastTier.normalised(),
+		observations: obs,
 	}, nil
 }
 
@@ -84,7 +89,7 @@ func checkIdentity(s Snapshot) error {
 	if s.Version < 1 {
 		return shared.Invalid("version must be at least 1")
 	}
-	return nil
+	return s.FastTier.validate(s.Window)
 }
 
 func checkState(s Snapshot) error {
@@ -163,7 +168,11 @@ func (s *NodeScorecard) Recompute(now time.Time) []shared.Event {
 	s.state, s.grade, s.metrics = state, grade, metrics
 	s.computedAt, s.dirty = now, false
 	s.version++
-	return s.eventsSince(prev)
+	var flip *tierFlip
+	if s.window == Window7d {
+		s.fastTier, flip = s.fastTier.assess(state, metrics.OnTimeHandoverRate, now)
+	}
+	return append(s.eventsSince(prev), s.tierEvents(flip)...)
 }
 
 func (s *NodeScorecard) eventsSince(prev NodeScorecard) []shared.Event {
@@ -285,6 +294,6 @@ func (s *NodeScorecard) Snapshot() Snapshot {
 	sortObservations(list)
 	return Snapshot{
 		NodeID: s.nodeID, Window: s.window, State: s.state, Grade: s.grade, Metrics: s.metrics,
-		ComputedAt: s.computedAt, Dirty: s.dirty, Version: s.version, Observations: list,
+		ComputedAt: s.computedAt, Dirty: s.dirty, Version: s.version, FastTier: s.fastTier, Observations: list,
 	}
 }

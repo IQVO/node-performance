@@ -82,6 +82,19 @@ func (r *ScorecardRepository) ListDue(ctx context.Context, now time.Time, limit 
 	return out, nil
 }
 
+// CountFastTierSuspended returns how many stored scorecards are suspended from
+// the fast tiers (only 7d ones can be).
+func (r *ScorecardRepository) CountFastTierSuspended(ctx context.Context) (int, error) {
+	defer r.s.enter(ctx)()
+	n := 0
+	for _, snap := range r.s.scorecards {
+		if snap.FastTier.Suspended {
+			n++
+		}
+	}
+	return n, nil
+}
+
 // ScorecardReader is the in-memory ports.ScorecardReader.
 type ScorecardReader struct{ s *Store }
 

@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/claudioed/node-performance/internal/application/ports"
+	"github.com/claudioed/node-performance/internal/domain/scorecard"
+	"github.com/claudioed/node-performance/internal/domain/shared"
 )
 
 const (
@@ -46,7 +48,8 @@ func (r Recompute) Run(ctx context.Context) (RecomputeResult, error) {
 			return res, fmt.Errorf("list due scorecards: %w", err)
 		}
 		for _, id := range ids {
-			events, err := r.one(ctx, id)
+			done, err := r.one(ctx, id)
+			events := done.events
 			r.recordOutcome(ctx, events, err)
 			switch {
 			case errors.Is(err, ports.ErrConcurrentUpdate):
@@ -56,6 +59,7 @@ func (r Recompute) Run(ctx context.Context) (RecomputeResult, error) {
 			case events >= 0:
 				res.Recomputed++
 				res.Events += events
+				r.logFlip(ctx, done.flip)
 			}
 		}
 		if len(ids) < RecomputeBatch {
@@ -65,12 +69,19 @@ func (r Recompute) Run(ctx context.Context) (RecomputeResult, error) {
 	return res, ctx.Err()
 }
 
-// one recomputes one scorecard and returns how many events it raised; -1 means
-// the scorecard vanished or was no longer due.
-func (r Recompute) one(ctx context.Context, id string) (int, error) {
-	raised := -1
+// recomputed is what one scorecard's recompute did: how many events it raised
+// (-1: the scorecard vanished or was no longer due) and the eligibility flip it
+// caused, when it did.
+type recomputed struct {
+	events int
+	flip   *scorecard.NodeTierEligibilityChanged
+}
+
+// one recomputes one scorecard in one unit of work.
+func (r Recompute) one(ctx context.Context, id string) (recomputed, error) {
+	done := recomputed{events: -1}
 	err := transact(ctx, r.UoW, func(ctx context.Context) error {
-		raised = -1
+		done = recomputed{events: -1}
 		now := r.now()
 		sc, err := r.Scorecards.Get(ctx, id)
 		if errors.Is(err, ports.ErrNotFound) {
@@ -89,10 +100,32 @@ func (r Recompute) one(ctx context.Context, id string) (int, error) {
 		if err := r.Outbox.Append(ctx, events...); err != nil {
 			return fmt.Errorf("append events to outbox: %w", err)
 		}
-		raised = len(events)
+		done = recomputed{events: len(events), flip: firstTierChange(events)}
 		return nil
 	})
-	return raised, err
+	return done, err
+}
+
+// firstTierChange returns the first NodeTierEligibilityChanged of events: the
+// two events of one flip carry the same facts, so it stands for the flip.
+func firstTierChange(events []shared.Event) *scorecard.NodeTierEligibilityChanged {
+	for _, e := range events {
+		if c, ok := e.(scorecard.NodeTierEligibilityChanged); ok {
+			return &c
+		}
+	}
+	return nil
+}
+
+// logFlip writes the INFO line of one fast-tier eligibility flip, after the
+// unit of work committed.
+func (r Recompute) logFlip(ctx context.Context, flip *scorecard.NodeTierEligibilityChanged) {
+	if flip == nil {
+		return
+	}
+	r.logger().InfoContext(ctx, "fast tier eligibility changed",
+		"node_id", string(flip.NodeID), "eligible", flip.Eligible, "metric", string(flip.Metric),
+		"value", flip.Value, "threshold", flip.Threshold, "window", string(flip.Window))
 }
 
 // internalErrorReason is the reason of every recompute failure that is not a

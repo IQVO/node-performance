@@ -142,6 +142,11 @@ const sidebars: SidebarsConfig = {
           label: '0012 Adopt the fleet REST API guideline',
           href: '/docs/adr/0012-adopt-the-fleet-rest-api-guideline',
         },
+        {
+          type: 'link',
+          label: '0013 fast-tier eligibility from the 7-day window',
+          href: '/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window',
+        },
       ],
     },
   ],

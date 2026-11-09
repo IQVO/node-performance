@@ -19,6 +19,9 @@ var scorecardCases = []named{
 	{"updating an id that was never stored is ErrConcurrentUpdate", scUpdateMissing},
 	{"a save replaces the stored observation set", scReplacesObservations},
 	{"ListDue returns the due scorecards by id, up to the limit", scListDue},
+	{"a suspended 7d scorecard round-trips its fast tier state, streak and day", scFastTierRoundTrip},
+	{"an update keeps or clears the fast tier streak", scFastTierUpdates},
+	{"CountFastTierSuspended counts the suspended 7d scorecards", scFastTierCount},
 }
 
 func scGetMiss(t *testing.T, f Fixture) {

@@ -24,7 +24,7 @@ flowchart LR
     DP["delivery-promise"] -->|"Kafka: PromiseKept, PromiseBroken"| NP
     OA["offer-availability"] -->|"Kafka: InventoryFeedApplied"| NP
     NT["node-topology"] -->|"Kafka: 2 event types, no effect"| NP
-    NP -->|"Kafka events: NodeScorecardUpdated"| DP
+    NP -->|"Kafka events: NodeScorecardUpdated, NodeTierEligibilityChanged"| DP
     NP -->|"Kafka events: NodeScorecardUpdated"| OS["order-sourcing"]
     NP -->|"Kafka analytics: NodeThresholdBreached"| AN["analytics, no consumer"]
     VC2["vendor-connectivity"] -->|"REST GET /scorecards/nodeId"| NP
@@ -80,6 +80,7 @@ id minted once, at-least-once delivery) and the always-on relay. Envelope: `sour
 | Event | Topic | `type` | Consumers |
 | --- | --- | --- | --- |
 | `NodeScorecardUpdated` | `retailnetwork.node-performance.events` | `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated` | `delivery-promise` (local scorecard view for its handicap), `order-sourcing` (scorecard view for assignment cost) |
+| `NodeTierEligibilityChanged` | `retailnetwork.node-performance.events` | `com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged` | `delivery-promise` (local fast-tier eligibility per node, so a suspended node stops winning `SAME_DAY` and `NEXT_DAY` sourcing) |
 | `NodeThresholdBreached` | `retailnetwork.node-performance.analytics` | `com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached` | none in the organization (analytics only) |
 
 The consumers' groups in warehouse-infra are `order-sourcing-node-performance` (order-sourcing's

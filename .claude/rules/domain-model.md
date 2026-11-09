@@ -26,6 +26,10 @@ A1-A23); the consumed contracts and local facts are in
   `PROVISIONAL` for a provisional scorecard.
 - **Threshold breach** — a metric moving to the unhealthy side of its threshold
   between two GRADED recomputes (`NodeThresholdBreached`, analytics only).
+- **Fast-tier eligibility** — one flag per node, held by the 7d scorecard, for the `SAME_DAY`
+  and `NEXT_DAY` tiers (`FastTierEligibility` policy, ADR 0013). Every node starts eligible; a
+  GRADED 7d `onTimeHandoverRate` below 0.90 suspends it; 0.95 or more on three consecutive
+  distinct UTC days of recompute reinstates it; a PROVISIONAL scorecard changes nothing.
 - **PurchaseOrderFacts** — a local read model keyed by `poNumber` (`nodeId`,
   `issuedAt`, `ackBy`, `requiredShipBy`), filled by vendor-connectivity events. It
   is a view of what a producer said, never an aggregate.
@@ -51,6 +55,10 @@ imports nothing outside `internal/domain`.
 - `NodeScorecardUpdated` — raised by `Recompute` when the state, grade or metrics
   of a GRADED scorecard changed, or when a GRADED scorecard fell back below the
   minimum. Integration event on `retailnetwork.node-performance.events`.
+- `NodeTierEligibilityChanged` — raised by `Recompute` of the 7d scorecard when the fast-tier
+  eligibility flag flips (policy `FastTierEligibility`, ADR 0013): suspension below 0.90 on-time
+  handover, reinstatement at 0.95 on three distinct UTC days; two events per flip, one per tier
+  (`SAME_DAY`, `NEXT_DAY`). Integration event on `retailnetwork.node-performance.events`.
 - `NodeThresholdBreached` — analytics only, on `retailnetwork.node-performance.analytics`.
 
 ## Use cases (`internal/application/usecases`)

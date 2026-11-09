@@ -3,7 +3,7 @@ id: domain-events
 title: Domain events
 sidebar_label: Domain events
 sidebar_position: 10
-description: "The two events Node Performance publishes and the fifteen it consumes, with full CloudEvents types, payloads, topics and idempotency rules."
+description: "The three events Node Performance publishes and the fifteen it consumes, with full CloudEvents types, payloads, topics and idempotency rules."
 ---
 
 # Domain events
@@ -57,6 +57,27 @@ Source: `internal/adapters/kafka/cloudevents/cloudevents.go` (`Type`, `DataSchem
 | `computedAt` | RFC 3339 instant | When the recompute ran. |
 
 The two inbound metrics are **not** on this event.
+
+### NodeTierEligibilityChanged
+
+| | |
+| --- | --- |
+| **Type** | `com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged` |
+| **Topic** | `retailnetwork.node-performance.events` (integration topic; dataschema stream `events`) |
+| **Subject / key** | the scorecardId of the 7d scorecard, `nodeId:7d` |
+| **Produced by** | `Recompute` of the 7d scorecard (policy `FastTierEligibility`, [ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)), only when the eligibility flag flips: two events per flip, one per tier, the same `changedAt`, in the same transaction as the scorecard save. No event for the initial eligible state. |
+| **Consumers** | `delivery-promise` (fast-tier eligibility per node) |
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `nodeId` | string | The node. |
+| `tier` | string | `SAME_DAY` or `NEXT_DAY`. |
+| `eligible` | boolean | The state the node moved to: `false` on suspension, `true` on reinstatement. |
+| `metric` | string | `onTimeHandoverRate`. |
+| `value` | number | The 7d rate that caused the change. |
+| `threshold` | number | 0.90 on suspension, 0.95 on reinstatement. |
+| `window` | string | `7d`. |
+| `changedAt` | RFC 3339 instant | The recompute instant. |
 
 ### NodeThresholdBreached
 

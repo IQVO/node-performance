@@ -117,10 +117,14 @@ ADR 0005).
 | Event | Topic | CloudEvents `type` |
 |---|---|---|
 | `NodeScorecardUpdated` | `retailnetwork.node-performance.events` | `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated` |
+| `NodeTierEligibilityChanged` | `retailnetwork.node-performance.events` | `com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged` |
 | `NodeThresholdBreached` | `retailnetwork.node-performance.analytics` (analytics only, no in-organization consumer) | `com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached` |
 
 `delivery-promise` and `order-sourcing` consume `NodeScorecardUpdated`; only
-the 30-day window feeds their decisions, the 7-day window feeds alerts only.
+the 30-day window feeds their grade-based decisions. The 7-day window feeds alerts and gates the
+SAME_DAY and NEXT_DAY tiers: `NodeTierEligibilityChanged` (two events per flip, one per tier) is
+raised when a node's 7-day on-time handover rate falls below 0.90 or recovers to 0.95 on three
+distinct days (ADR 0013).
 
 **Consumed** — 15 events from six producers, each topic under its own stable
 consumer group named by a mandatory environment variable (ADR 0003); every

@@ -33,7 +33,7 @@ step-by-step runtime view is in [Sequence diagrams](/docs/ddd/sequence-diagrams)
 | `Intake.InboundShipmentShipped` | `InboundShipmentShipped` | seller-inbound consumer | none |
 | `Intake.InboundReceiptSubmitted` | `InboundReceiptSubmitted` | vendor-connectivity consumer | none |
 | `Intake.Acknowledge` | `VendorOnboarded`, `SubmissionProcessed`, `NodeRegistered`, `NodeOperationalProfileDeclared` | vendor-connectivity and node-topology consumers | none |
-| `Recompute.Run` | timer, every `RECOMPUTE_INTERVAL` (default 1m) and once at boot | `cmd/api/workers.go` scheduler | `NodeScorecardUpdated`, `NodeThresholdBreached` |
+| `Recompute.Run` | timer, every `RECOMPUTE_INTERVAL` (default 1m) and once at boot | `cmd/api/workers.go` scheduler | `NodeScorecardUpdated`, `NodeThresholdBreached`, `NodeTierEligibilityChanged` |
 | `Queries.GetScorecard` | `GET /scorecards/{nodeId}`, MCP `get_scorecard`, A2A `node_performance` | REST, MCP, A2A | none |
 | `Queries.ListScorecardsByGrade` | `GET /scorecards?grade=`, MCP `list_scorecards_by_grade`, A2A `nodes_by_grade` | REST, MCP, A2A | none |
 
@@ -138,7 +138,13 @@ Writes only the inbox row for events with no effect (`VendorOnboarded`, `Submiss
   `PROVISIONAL` to `PROVISIONAL`); then, only between two `GRADED` states, one
   `NodeThresholdBreached` per metric that crossed its bound downward (on-time and promise-kept below
   0.90, late-ack above 0.05, reject above 0.10, expiry above 0.05, feed freshness above 240
-  minutes). The bound itself is healthy.
+  minutes). The bound itself is healthy. On the **7d** scorecard only, the `FastTierEligibility`
+  policy ([ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)) then runs on a
+  `GRADED` result: below 0.90 on-time handover it suspends the node from the `SAME_DAY` and
+  `NEXT_DAY` tiers, 0.95 or more on three consecutive distinct UTC days of recompute reinstates it
+  (a lower recompute resets the count; the same day twice counts once). A flip raises two
+  `NodeTierEligibilityChanged` (one per tier) after the other events, logs one INFO line and moves
+  the `nodeperf_fast_tier_ineligible_nodes` gauge. A `PROVISIONAL` result changes nothing.
 - **Errors**: a lost race counts `concurrent-update` and the scorecard stays due; any other error ends
   the run, is logged `recompute round failed` and counted `internal-error`; the next tick retries.
 - **Idempotency**: the outcome is a function of the observations and `now`; a run with nothing

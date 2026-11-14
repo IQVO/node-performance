@@ -19,8 +19,9 @@ the reasoning below is checked against this repository's code.
 - **It measures, it does not decide.** The grade is an input to decisions taken elsewhere:
   `delivery-promise` applies the handicap to the promise, `order-sourcing` prices the assignment, and
   suspending a node is a `node-topology` command issued by people. Node Performance publishes
-  `NodeScorecardUpdated` and stops (`internal/domain/scorecard` has no policy that changes another
-  context's data).
+  `NodeScorecardUpdated` and, from its `FastTierEligibility` policy, `NodeTierEligibilityChanged`, and stops
+  (`internal/domain/scorecard` has no policy that changes another context's data; the flag it
+  publishes is applied by `delivery-promise`).
 - **The hard, competitive part is elsewhere.** The network's advantage is the delivery promise and the
   late assignment (the two Core contexts). Measured capability is what keeps *declared* capability
   honest, but customers do not choose a network for how it grades its vendors.

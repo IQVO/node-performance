@@ -25,11 +25,15 @@ flowchart LR
     ST -->|"PackageHandedOver"| NP
     NP -->|"NodeScorecardUpdated"| DP
     NP -->|"NodeScorecardUpdated"| OS
+    NP -->|"NodeTierEligibilityChanged, 7d, on a flip"| DP
 ```
 
 Source: `internal/application/usecases/intake.go` (`PurchaseOrderIssued`, `ShipmentConfirmed`,
-`PackageHandedOver`), `internal/application/usecases/recompute.go`. The purchase-order facts must
+`PackageHandedOver`), `internal/application/usecases/recompute.go`,
+`internal/domain/scorecard/eligibility.go`. The purchase-order facts must
 arrive before the handover can be judged; a handover that beats them is retried, then dead-lettered.
+`NodeTierEligibilityChanged` is raised only when the 7d on-time handover rate moves a node across the
+fast-tier bounds (below 0.90 suspends, 0.95 or more on three days reinstates).
 
 ## Scenario 2: a vendor acknowledges, rejects or lets an order expire
 
@@ -99,6 +103,7 @@ Source: `internal/adapters/inbound/http/handlers.go`, `internal/adapters/inbound
 | --- | --- | --- | --- |
 | Facts (15 types) | events | the six upstream producers | Node Performance |
 | `NodeScorecardUpdated` | event | Node Performance | `delivery-promise`, `order-sourcing` |
+| `NodeTierEligibilityChanged` | event | Node Performance | `delivery-promise` |
 | `NodeThresholdBreached` | event | Node Performance | none |
 | `GetScorecard` and `ListScorecardsByGrade` | queries | Node Performance (REST, MCP, A2A) | `vendor-connectivity`, agents, the console |
 

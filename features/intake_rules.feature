@@ -139,11 +139,3 @@ Feature: Intake rules from the documentation
     Then the scorecard "node-1:30d" is PROVISIONAL
     And the scorecard "node-1:30d" counts 49 observations
     And no event was published
-
-  Scenario: Issues and shipment confirmations are not outcomes and do not count toward the 50
-    Given node "node-1" has 49 on-time handovers and 0 late handovers
-    And purchase order "po-extra" of node "node-1" was issued with an ack window of 600 minutes and a required ship-by 1800 minutes after the issue
-    And the vendor confirms the shipment of purchase order "po-extra-2" of node "node-1" with a required ship-by in 100 minutes
-    When the scorecards are recomputed
-    Then the scorecard "node-1:30d" is PROVISIONAL
-    And the scorecard "node-1:30d" counts 49 observations

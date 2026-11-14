@@ -36,8 +36,9 @@ observes (**Declared vs Measured**).
 - **Execution context**: it computes the grades itself (recompute) and **analysis context** for the
   other contexts, which read the result. Vendors see their own scorecard only through
   `vendor-connectivity`.
-- It is **not** a decision context: it grades, and `delivery-promise`, `order-sourcing` and people
-  decide.
+- It is **not** a decision context for promises or sourcing: it grades, and `delivery-promise`,
+  `order-sourcing` and people decide. The one decision it takes itself is the fast-tier eligibility
+  flag of a node (`FastTierEligibility`, [ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)), which `delivery-promise` then applies.
 
 ## 5. Inbound communication
 
@@ -58,6 +59,7 @@ observes (**Declared vs Measured**).
 | Message | Kind | To | Channel |
 | --- | --- | --- | --- |
 | `NodeScorecardUpdated` | event | `delivery-promise`, `order-sourcing` | Kafka `retailnetwork.node-performance.events` |
+| `NodeTierEligibilityChanged` | event (two per flip, one per tier) | `delivery-promise` | Kafka `retailnetwork.node-performance.events` |
 | `NodeThresholdBreached` | event | analytics (no in-organization consumer) | Kafka `retailnetwork.node-performance.analytics` |
 
 No command and no query leaves the context: it calls no sibling.
@@ -65,7 +67,7 @@ No command and no query leaves the context: it calls no sibling.
 ## 7. Ubiquitous language
 
 Scorecard, Window, Observation, Grade, On-time handover rate, Late ack rate, Provisional, Threshold
-breach, Declared vs Measured; see [Ubiquitous language](/docs/ddd/ubiquitous-language).
+breach, Fast-tier eligibility, Reinstatement streak, Declared vs Measured; see [Ubiquitous language](/docs/ddd/ubiquitous-language).
 
 ## 8. Business decisions
 
@@ -76,7 +78,13 @@ breach, Declared vs Measured; see [Ubiquitous language](/docs/ddd/ubiquitous-lan
 5. Only node-attributable broken promises (`LATE`, `LATE_HANDOVER`, `VENDOR_REJECT`, `ACK_EXPIRED`)
    count against the node; `LOST` and `RETURNED` do not.
 6. An acknowledgement in the last tenth of its ack window is late; an expired order is always late.
-7. This context never suspends a node and never changes a promise.
+7. A `GRADED` 7d scorecard with an on-time handover rate below 0.90 suspends the node from the
+   `SAME_DAY` and `NEXT_DAY` tiers; 0.95 or more on three consecutive distinct UTC days of recompute
+   reinstates it (`FastTierEligibility`, [ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)). A flip is published as `NodeTierEligibilityChanged`,
+   one event per tier. A `PROVISIONAL` result changes nothing.
+8. This context never changes a node's status in `node-topology` and never changes a promise: it
+   publishes the flag, and `delivery-promise` drops an ineligible node from the candidates of future
+   quotes and estimates only (its `apis/asyncapi.yaml`).
 
 ## 9. Assumptions
 

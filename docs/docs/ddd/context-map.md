@@ -47,6 +47,7 @@ flowchart LR
     NF["network-fulfillment<br/>warehouse-systems fleet"]
     NP -->|"C/S, NP is Supplier<br/>REST GET /scorecards/nodeId"| VC
     NP -->|"CF<br/>Kafka NodeScorecardUpdated"| DP
+    NP -->|"CF<br/>Kafka NodeTierEligibilityChanged"| DP
     NP -->|"CF<br/>Kafka NodeScorecardUpdated"| OS
     NP -.->|"PL<br/>Kafka NodeThresholdBreached"| AN
     NP -. "Separate Ways" .- NF
@@ -67,7 +68,7 @@ event with no in-organization consumer; a dotted line without a head means no re
 | `vendor-connectivity` | U to D (NP upstream) | Customer/Supplier, NP is Supplier | REST `GET /scorecards/{nodeId}` | `GetScorecard` | The only synchronous edge: `vendor-connectivity` needs an answer inside a vendor's request. If NP is down only that route fails. |
 | `shipping-and-tracking` | U to D | Conformist | Kafka `retailnetwork.shipping-and-tracking.events` | `PackageHandedOver` | The handover instant is defined by the producer's policy; NP accepts it. |
 | `delivery-promise` | U to D (NP downstream) | Conformist | Kafka `retailnetwork.delivery-promise.events` | `PromiseKept`, `PromiseBroken` | The judgement against `deliverByLatest` is the producer's; NP counts it. |
-| `delivery-promise` | U to D (NP upstream) | Conformist (`delivery-promise` conforms) | Kafka `retailnetwork.node-performance.events` | `NodeScorecardUpdated` | `delivery-promise` keeps a local scorecard view and applies its handicap; no sync call on the promise hot path. |
+| `delivery-promise` | U to D (NP upstream) | Conformist (`delivery-promise` conforms) | Kafka `retailnetwork.node-performance.events` | `NodeScorecardUpdated`, `NodeTierEligibilityChanged` | `delivery-promise` keeps a local scorecard view and applies its handicap; no sync call on the promise hot path. It also keeps a local fast-tier eligibility copy and drops an ineligible node from the `SAME_DAY` and `NEXT_DAY` candidates of future quotes and estimates ([ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)). |
 | `offer-availability` | U to D | Conformist | Kafka `retailnetwork.offer-availability.events` | `InventoryFeedApplied` | Consumed as published. |
 | `node-topology` | U to D | Conformist | Kafka `retailnetwork.node-topology.events` | `NodeRegistered`, `NodeOperationalProfileDeclared` | The master of node identity and the declared profile; consumed without effect. |
 | `seller-inbound` | U to D | Conformist | Kafka `retailnetwork.seller-inbound.events` | `InboundShipmentShipped` | The shipped instant starts the inbound timeliness metric. |

@@ -24,7 +24,9 @@ has two: one for the `7d` window and one for the `30d` window (for example `N-00
 Rolling-window performance of one node. It holds the observations counted in its window (a map keyed
 by the source CloudEvents id), the `Metrics` value object computed from them, its state
 (`PROVISIONAL` or `GRADED`), a `Grade` when graded, `computedAt`, a `dirty` flag and a `version`.
-It decides nothing about the node's eligibility; it states how the node has behaved.
+It states how the node has behaved, and the `7d` scorecard also holds the node's fast-tier eligibility
+state (`FastTierState`: `Suspended`, a reinstatement streak and the streak's last UTC day), decided by the
+`FastTierEligibility` policy ([ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)); the `30d` scorecard never holds a suspension.
 
 ### 3. State transitions
 
@@ -52,6 +54,7 @@ changes no state. There is no terminal state: a scorecard lives as long as the n
 | Observation instants are UTC at microsecond precision; the id is 1 to 200 characters | `shared.Instant`, `Observation.validate` |
 | `scorecardId` equals `nodeId:window` | CHECK `scorecards_id_key` |
 | A save expects the stored `version` to be the previous one | `ports.ErrConcurrentUpdate` from the repository |
+| Only the `7d` scorecard can be suspended; an eligible node has no streak; a streak is 0 to 2 days and goes with its last day | `FastTierState.validate` (`eligibility.go`) |
 
 ### 5. Corrective policies
 
@@ -62,12 +65,17 @@ changes no state. There is no terminal state: a scorecard lives as long as the n
   `promiseKeptRate >= 0.90`, `lateAckRate <= 0.05`, `rejectRate <= 0.10`, `expiryRate <= 0.05`,
   `feedFreshnessP95Minutes <= 240`; the bound itself is healthy. A breach is raised per metric that
   moved from healthy to unhealthy between two `GRADED` states.
+- **Fast-tier eligibility** (`eligibility.go`, [ADR 0013](/docs/adr/0013-fast-tier-eligibility-from-the-7-day-window)): on the `7d` scorecard only, a `GRADED`
+  recompute with `onTimeHandoverRate < 0.90` suspends the node from the `SAME_DAY` and `NEXT_DAY` tiers;
+  `>= 0.95` on three consecutive distinct UTC days of recompute reinstates it, and a lower recompute
+  resets the count. A `PROVISIONAL` recompute changes nothing.
 - **Window slide**: `Recompute` keeps only observations whose instant is after `now - window`.
 - **Duplicate tolerance**: a redelivered event is stopped at the inbox (`processed_events`);
   `ErrDuplicateObservation` is the aggregate's second line and the intake treats it as success.
-- **Neighbour reactions** (not this context's decisions): `delivery-promise` applies its handicap,
-  `order-sourcing` its assignment cost, `vendor-connectivity` shows the scorecard to the vendor.
-  Nobody suspends a node automatically.
+- **Neighbour reactions** (not this context's decisions): `delivery-promise` applies its handicap and
+  drops an ineligible node from the candidates of future quotes, `order-sourcing` its assignment cost,
+  `vendor-connectivity` shows the scorecard to the vendor. Nothing changes a node's status in
+  `node-topology` automatically.
 
 ### 6. Handled commands
 
@@ -86,6 +94,7 @@ aggregate: they are separate local tables written by the same intake.
 | --- | --- | --- |
 | `NodeScorecardUpdated` | a `Recompute` changed state, grade or metrics (never `PROVISIONAL` to `PROVISIONAL`) | `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated` |
 | `NodeThresholdBreached` | a `Recompute` between two `GRADED` states moved a metric across its bound (one per metric) | `com.retailnetwork.partner.node-performance.scorecard.NodeThresholdBreached` |
+| `NodeTierEligibilityChanged` | a `Recompute` of the `7d` scorecard flipped the fast-tier eligibility flag (two events per flip, one per tier) | `com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged` |
 
 `RecordObservation` raises no event: an observation is input, the grade is the output.
 
@@ -102,7 +111,8 @@ design but has not been load-tested.
 Two scorecards per node plus the observations inside each window (the `30d` scorecard holds the last
 30 days of observations of its node, the `7d` the last 7). Each save replaces the set and deletes the
 rows that left the window. Events: at most one `NodeScorecardUpdated` per scorecard per recompute, plus
-zero or more `NodeThresholdBreached`.
+zero or more `NodeThresholdBreached`, plus two `NodeTierEligibilityChanged` when the `7d` scorecard flips
+the eligibility flag.
 
 ## Read models
 

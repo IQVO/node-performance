@@ -290,7 +290,7 @@ func (w *world) breachIsAbout(subject, node, window string) error {
 func (w *world) readingNodeNotFound(node string) error {
 	_, err := w.queries.GetScorecard(w.ctx(), node)
 	if !errors.Is(err, ports.ErrNotFound) {
-		return fmt.Errorf("reading node %q = %v, want not found", node, err)
+		return fmt.Errorf("reading node %q = %w, want not found", node, err)
 	}
 	return nil
 }

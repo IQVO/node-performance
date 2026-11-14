@@ -34,7 +34,7 @@ fleet-wide [warehouse-docs site](https://iqvo.github.io/warehouse-docs/network/c
 | DDD artifacts | [Core domain chart](https://iqvo.github.io/node-performance/docs/ddd/core-domain-chart), [Bounded context canvas](https://iqvo.github.io/node-performance/docs/ddd/bounded-context-canvas), [Context map](https://iqvo.github.io/node-performance/docs/ddd/context-map), [Aggregate design canvas](https://iqvo.github.io/node-performance/docs/ddd/aggregate-design-canvas), [Domain message flow](https://iqvo.github.io/node-performance/docs/ddd/domain-message-flow), [EventStorming](https://iqvo.github.io/node-performance/docs/ddd/eventstorming), [Class diagram](https://iqvo.github.io/node-performance/docs/ddd/class-diagram), [Entity relationship](https://iqvo.github.io/node-performance/docs/ddd/entity-relationship), [Sequence diagrams](https://iqvo.github.io/node-performance/docs/ddd/sequence-diagrams), [Domain events](https://iqvo.github.io/node-performance/docs/ddd/domain-events) |
 | API reference | [API overview](https://iqvo.github.io/node-performance/docs/api-reference), [Event catalogue](https://iqvo.github.io/node-performance/docs/api-reference/events), the generated REST reference |
 | Ecosystem | [Integration](https://iqvo.github.io/node-performance/docs/ecosystem/integration), [MCP tools](https://iqvo.github.io/node-performance/docs/mcp/tools) |
-| Decisions | [ADR index](https://iqvo.github.io/node-performance/docs/adr) (11 ADRs, sources in [`docs/adr/`](docs/adr/index.md)) |
+| Decisions | [ADR index](https://iqvo.github.io/node-performance/docs/adr) (13 ADRs, sources in [`docs/adr/`](docs/adr/index.md)) |
 
 ## What it does
 
@@ -328,13 +328,14 @@ on pre-commit and `make check` on pre-push.
 
 ## Architecture Decision Records
 
-Index: [`docs/adr/index.md`](docs/adr/index.md) — 11 ADRs (0001–0011): the
+Index: [`docs/adr/index.md`](docs/adr/index.md) — 13 ADRs (0001–0013): the
 bounded context (0001), aggregates and invariants (0002), consumed contracts
 and local facts (0003), the CloudEvents catalogue (0004), the outbox relay
 (0005), the HTTP adapter, consumers and readiness (0006), the read-only MCP
 server (0007), the web console remote (0008), the inbound timeliness and
 accuracy metrics (0009), the fleet observability standard (0010), the
-read-only A2A agent (0011).
+read-only A2A agent (0011), the fleet REST API guideline (0012), fast-tier
+eligibility from the 7-day window (0013).
 
 ## License
 

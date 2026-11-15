@@ -2,7 +2,9 @@ package scorecard
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,5 +69,37 @@ func TestFastTierRestoreRefusesACorruptState(t *testing.T) {
 func TestFastTiersAreSameDayAndNextDay(t *testing.T) {
 	if got := FastTiers(); !reflect.DeepEqual(got, []Tier{TierSameDay, TierNextDay}) {
 		t.Fatalf("FastTiers = %v", got)
+	}
+}
+
+// TestFastTierStreakBoundErrorNamesTheLargestLegalStreak pins the message: a
+// corrupt row is diagnosed with the legal range 0..reinstateAfterDays-1.
+func TestFastTierStreakBoundErrorNamesTheLargestLegalStreak(t *testing.T) {
+	day := utcDay(base)
+	err := FastTierState{Suspended: true, Streak: reinstateAfterDays, StreakDay: day}.validate(Window7d)
+	want := fmt.Sprintf("reinstatement streak must be 0 to %d, got %d", reinstateAfterDays-1, reinstateAfterDays)
+	if !errors.Is(err, shared.ErrValidation) || !strings.HasSuffix(err.Error(), want) {
+		t.Fatalf("validate = %v, want %q", err, want)
+	}
+}
+
+// TestFastTierRestoreAcceptsEveryLegalStreak pins the lower and upper edge of
+// the streak range and the empty/non-empty pairing with the streak day.
+func TestFastTierRestoreAcceptsEveryLegalStreak(t *testing.T) {
+	day := utcDay(base)
+	for streak := 0; streak < reinstateAfterDays; streak++ {
+		state := FastTierState{Suspended: true, Streak: streak}
+		if streak > 0 {
+			state.StreakDay = day
+		}
+		snap := Snapshot{NodeID: "n", Window: Window7d, State: StateProvisional, Metrics: EmptyMetrics(), Version: 1, FastTier: state}
+		got, err := Restore(snap)
+		if err != nil || got.FastTier() != state {
+			t.Fatalf("streak %d must restore: %v", streak, err)
+		}
+	}
+	snap := Snapshot{NodeID: "n", Window: Window30d, State: StateProvisional, Metrics: EmptyMetrics(), Version: 1}
+	if got, err := Restore(snap); err != nil || !got.FastTier().Eligible() {
+		t.Fatalf("an eligible 30d card must restore: %v", err)
 	}
 }

@@ -124,8 +124,8 @@ func (r Recompute) logFlip(ctx context.Context, flip *scorecard.NodeTierEligibil
 		return
 	}
 	r.logger().InfoContext(ctx, "fast tier eligibility changed",
-		"node_id", string(flip.NodeID), "eligible", flip.Eligible, "metric", string(flip.Metric),
-		"value", flip.Value, "threshold", flip.Threshold, "window", string(flip.Window))
+		"node_id", sanitizeLog(string(flip.NodeID)), "eligible", flip.Eligible, "metric", sanitizeLog(string(flip.Metric)),
+		"value", flip.Value, "threshold", flip.Threshold, "window", sanitizeLog(string(flip.Window)))
 }
 
 // internalErrorReason is the reason of every recompute failure that is not a

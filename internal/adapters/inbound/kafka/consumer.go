@@ -91,7 +91,7 @@ func (c *Consumer) HandleMessage(ctx context.Context, value []byte) error {
 	logger := defaultLogger(c.Logger)
 	e, err := cloudevents.Decode(value)
 	if err != nil {
-		logger.WarnContext(ctx, "skipping a message that is not a valid CloudEvent", "consumer", c.Name, "topic", c.Topic, "error", err)
+		logger.WarnContext(ctx, "skipping a message that is not a valid CloudEvent", "consumer", c.Name, "topic", c.Topic, "error", sanitizeErr(err))
 		return nil
 	}
 	handle, ok := c.Handlers[e.Type()]
@@ -102,7 +102,7 @@ func (c *Consumer) HandleMessage(ctx context.Context, value []byte) error {
 	if !errors.Is(err, errBadPayload) && !errors.Is(err, usecases.ErrInvalidEvent) {
 		return err
 	}
-	logger.WarnContext(ctx, "dead-lettering an event that can never be applied", "consumer", c.Name, "type", e.Type(), "event_id", e.ID(), "error", err)
+	logger.WarnContext(ctx, "dead-lettering an event that can never be applied", "consumer", c.Name, "type", sanitizeLog(e.Type()), "event_id", sanitizeLog(e.ID()), "error", sanitizeErr(err))
 	return fmt.Errorf("%w: %w", errPoison, err)
 }
 
@@ -117,5 +117,5 @@ func decodeData[T any](e ce.Event) (T, error) {
 
 // logOutcome records what an intake use case did.
 func logOutcome(ctx context.Context, logger *slog.Logger, e ce.Event, outcome usecases.Outcome) {
-	logger.InfoContext(ctx, "event processed", "type", e.Type(), "event_id", e.ID(), "subject", e.Subject(), "outcome", string(outcome))
+	logger.InfoContext(ctx, "event processed", "type", sanitizeLog(e.Type()), "event_id", sanitizeLog(e.ID()), "subject", sanitizeLog(e.Subject()), "outcome", sanitizeLog(string(outcome)))
 }

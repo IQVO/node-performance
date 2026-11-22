@@ -24,10 +24,25 @@ unleash:
     # sit strictly BELOW the number this repo can meet today. Measure
     # first (`make mutation-full`), THEN set these -- don't guess/copy a
     # sibling repo's numbers, every domain layer's mutant survivability
-    # differs. Measured on 2026-10-23 with `gremlins unleash` per package: shared
-    # 31 killed of 31, scorecard 95 killed of 95 (efficacy and mutator coverage
-    # 100% for both); 95 is strictly below both. See HARNESS.md's mutation-testing section for the
+    # differs. See HARNESS.md's mutation-testing section for the
     # tagless-switch-under-reports pitfall before assuming a low number
     # means missing tests.
-    efficacy: "95"
-    mutant-coverage: "95"
+    # Measured 2026-11-15 (gremlins v0.6.0, one worker, one `gremlins unleash
+    # ./internal/domain/<pkg>` each, the exact loop `make mutation` and the
+    # mutation-fast CI job run), killed/lived/not-covered:
+    #   scorecard 124/0/8  shared 31/0/0
+    # efficacy is 100.00% in both. Mutator coverage is 100.00% for shared and 93.94%
+    # for scorecard: its 8 NOT COVERED mutants all sit on the `case` expressions of
+    # FastTierState.validate's tagless switch (eligibility.go:55,57,59,61), which Go's
+    # cover profile never attributes to any block (see MUTATION.md; HARNESS.md "tagless
+    # switch" pitfall). They are killed in fact (verified by hand).
+    # efficacy 99 is the fleet standard; mutant-coverage 93 is strictly below the
+    # scorecard measurement. Raise it to 99 once that switch is an if-chain.
+    #
+    # NOTE: the values are UNQUOTED on purpose. gremlins v0.6.0 reads the threshold
+    # with a float64/int type assertion, so a quoted string ("95") is read as 0 and the
+    # gate is silently DISABLED. Unquoted numbers are enforced (measured on
+    # node-topology: efficacy: 100 on a 100% package fails with "below
+    # efficacy-threshold"; "100" passes).
+    efficacy: 99
+    mutant-coverage: 93

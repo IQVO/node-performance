@@ -5,7 +5,7 @@ description: Publish or consume a cross-service Kafka event in this service: Clo
 
 # How to add an integration event
 
-node-performance publishes two events and consumes fifteen event types (ADR 0003,
+node-performance publishes three events and consumes fifteen event types (ADR 0003,
 ADR 0004). The envelope is CloudEvents 1.0 only; read
 `.claude/rules/integration-events.md` and `.claude/rules/fleet/cloudevents.md`
 first. The worked example is `NodeThresholdBreached` (published, analytics only) and

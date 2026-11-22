@@ -65,3 +65,7 @@ Postgres transaction. Something has to drain the rows to Kafka. The harness temp
 - Postgres integration tests prove Drain (order, failure recording, the cap and re-arming,
   concurrent drains); a Kafka integration test proves that the outbox rows become exactly
   the CloudEvents on the right topics.
+
+## Addendum 2026-11-13: current state
+
+The encoder encodes three events, not two: `NodeTierEligibilityChanged` goes to `retailnetwork.node-performance.events` like `NodeScorecardUpdated` (`internal/adapters/outbound/kafka/encoder.go:131`, ADR 0013). `NodeThresholdBreached` is still the only one selected by `AnalyticsOnly()` for the analytics topic.

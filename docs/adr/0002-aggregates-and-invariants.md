@@ -215,3 +215,7 @@ metric crosses its threshold downward (A11).
   (REST additions), A23 (analytics stream).
 - Adding a metric changes `Metrics`, `NewMetrics`, the OpenAPI schema and the
   `NodeScorecardUpdated` message together (additive evolution).
+
+## Addendum 2026-11-13: current state
+
+`NodeScorecard.Recompute` raises a third event, `NodeTierEligibilityChanged`, on the 7d scorecard when the fast-tier eligibility flag flips (two events per flip, one per tier; `internal/domain/scorecard/eligibility.go:115`, ADR 0013). The 7d scorecard also holds that flag, a reinstatement streak and its last UTC day (`FastTierState`, `eligibility.go:37`), so "it raises `NodeScorecardUpdated` and `NodeThresholdBreached`" and A13's "both events" describe the first two events only.

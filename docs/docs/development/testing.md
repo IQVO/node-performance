@@ -32,12 +32,22 @@ shared `repocontract` suite exist for tests only; `TestRuntimeBinaryHasNoInMemor
 
 ## Godog features
 
-`features/` holds 7 feature files with **48** `Scenario` / `Scenario Outline` entries:
+`features/` holds 15 feature files with **114** `Scenario` / `Scenario Outline` definitions
+(`git grep -c -E "^[[:space:]]*Scenario" -- features`); the runner executes them as **176**
+scenarios because the Examples rows of the Outlines expand (the `176 scenarios (176 passed)` line of
+`go test ./features -run TestFeatures -count=1 -v`). The files written from the existing suite:
 `observations.feature` (9), `metrics.feature` (8), `inbound_metrics.feature` (8),
-`grading.feature` (7), `rest_reads.feature` (7), `alerts.feature` (5) and
-`published_payloads.feature` (4), with step definitions in `features/steps_*_test.go` and the
-suite entry point `features/features_test.go` (`TestFeatures`). No `.go` file lives at the repo
-root. They run in the `bdd` CI job and as part of `make check-all`.
+`grading.feature` (7), `rest_reads.feature` (7), `tier_eligibility.feature` (6),
+`alerts.feature` (5) and `published_payloads.feature` (4). The rule files derived from the
+context documentation (ADR 0002, 0003, 0009, 0013): `intake_rules.feature` (17, intake and
+idempotency, ship-by merge, late windows, id bounds), `metrics_rules.feature` (11, grading,
+freshness p95, regrade, windows), `alerts_rules.feature` (9, ThresholdAlert bounds and recovery),
+`inbound_rules.feature` (9, inbound metrics and receipt windows), `read_rules.feature` (8, REST
+reads, ids, cursor, limit, grade filter), `tier_rules.feature` (5, FastTierEligibility) and
+`payload_rules.feature` (1, `NodeScorecardUpdated` payload). Step definitions are in
+`features/steps_*_test.go` and the suite entry point is `features/features_test.go`
+(`TestFeatures`). No `.go` file lives at the repo root. They run in the `bdd` CI job and as part
+of `make check-all`.
 
 ## Integration tests
 

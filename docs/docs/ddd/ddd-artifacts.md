@@ -25,6 +25,6 @@ diagram carries a `Source:` line naming the files it was drawn from. The shared 
 | [Class diagram](/docs/ddd/class-diagram) | The domain model and the hexagonal ports and adapters | UML |
 | [Entity relationship](/docs/ddd/entity-relationship) | The Postgres schema | persistence view |
 | [Sequence diagrams](/docs/ddd/sequence-diagrams) | Adapter, use case, aggregate, outbox, Kafka | UML |
-| [Domain events](/docs/ddd/domain-events) | The two published and 15 consumed CloudEvents types | message catalogue |
+| [Domain events](/docs/ddd/domain-events) | The three published and 15 consumed CloudEvents types | message catalogue |
 
 See also [Use cases](/docs/ddd/use-cases) and [Subdomain classification](/docs/ddd/subdomain-classification).

@@ -164,8 +164,21 @@ classDiagram
         +Threshold float64
         +AnalyticsOnly() true
     }
+    class NodeTierEligibilityChanged {
+        <<DomainEvent>>
+        +NodeID NodeID
+        +Tier Tier
+        +Eligible bool
+        +Metric MetricName
+        +Value float64
+        +Threshold float64
+        +Window Window
+        +ChangedAt time.Time
+        +AnalyticsOnly() false
+    }
     NodeScorecard ..> NodeScorecardUpdated : raises
     NodeScorecard ..> NodeThresholdBreached : raises
+    NodeScorecard ..> NodeTierEligibilityChanged : raises, 7d only
 ```
 
 Source: `internal/domain/scorecard/events.go`.

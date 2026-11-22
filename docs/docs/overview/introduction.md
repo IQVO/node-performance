@@ -19,8 +19,9 @@ It consumes what the network observed (purchase orders issued, accepted, rejecte
 packages handed over against `requiredShipBy`, promises kept or broken, inventory feeds
 applied, inbound shipments and receipts), keeps two `NodeScorecard` aggregates per node (a 7-day
 and a 30-day one), computes six graded metrics, grades the node `A` to `D` from 50 observations
-(`PROVISIONAL` below), raises `NodeThresholdBreached` when a metric crosses its bound, and
-publishes `NodeScorecardUpdated` for the contexts that act on the grade.
+(`PROVISIONAL` below), raises `NodeThresholdBreached` when a metric crosses its bound, publishes
+`NodeScorecardUpdated` for the contexts that act on the grade, and publishes `NodeTierEligibilityChanged`
+when the 7d scorecard suspends or reinstates a node for the `SAME_DAY` and `NEXT_DAY` tiers.
 
 :::info What runs on develop
 Three binaries: `cmd/api` (a chi REST adapter with two read routes, six Kafka consumers, a

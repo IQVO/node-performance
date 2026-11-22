@@ -21,3 +21,7 @@ The retail network is modelled as ten bounded contexts, each its own service and
 ## Consequences
 
 Relationships and the full consumed-event list are in the model and in the AsyncAPI contract added with the first feature PR.
+
+## Addendum 2026-11-13: current state
+
+Two statements above are out of date. Since ADR 0013 the context does suspend a node from the `SAME_DAY` and `NEXT_DAY` tiers (not its status in `node-topology`): the `FastTierEligibility` policy runs in `Recompute` of the 7d scorecard (`internal/domain/scorecard/eligibility.go:91`, `scorecard.go:173`). And three events are published, not two: `NodeTierEligibilityChanged` (topic `retailnetwork.node-performance.events`, consumed by `delivery-promise`) joins `NodeScorecardUpdated` and `NodeThresholdBreached` (`events.go`, `internal/adapters/outbound/kafka/encoder.go:131`).

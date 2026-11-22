@@ -13,7 +13,7 @@ network against what it declared and what was asked of it (acknowledgement laten
 on-time handover against `requiredShipBy`, promise-kept rate and inventory feed freshness) over
 rolling 7-day and 30-day windows, and grades the node (`A` to `D` from 50 observations,
 `PROVISIONAL` below). It consumes six sibling event topics, keeps two scorecards per node,
-publishes `NodeScorecardUpdated` and `NodeThresholdBreached` through a transactional outbox and
+publishes `NodeScorecardUpdated`, `NodeTierEligibilityChanged` and `NodeThresholdBreached` through a transactional outbox and
 serves two read-only REST routes. This repository is a domain-driven design study; it is not
 associated with any company (`README.md` disclaimer). Every variable is in
 [Configuration](/docs/operations/configuration); the symptom-driven view is
@@ -102,7 +102,7 @@ refuses to boot on a dirty database.
 | consumed | `retailnetwork.offer-availability.events` | `OFFER_AVAILABILITY_CONSUMER_GROUP` | `node-performance-offer-availability` |
 | consumed | `retailnetwork.node-topology.events` | `NODE_TOPOLOGY_CONSUMER_GROUP` | `node-performance-node-topology` |
 | consumed | `retailnetwork.seller-inbound.events` | `SELLER_INBOUND_CONSUMER_GROUP` | `node-performance-seller-inbound` |
-| published | `retailnetwork.node-performance.events` | none | `NodeScorecardUpdated` only |
+| published | `retailnetwork.node-performance.events` | none | `NodeScorecardUpdated` and `NodeTierEligibilityChanged` |
 | published | `retailnetwork.node-performance.analytics` | none | `NodeThresholdBreached` only |
 | dead letters | `<consumed topic>.dlq` | none | written by the consumers |
 

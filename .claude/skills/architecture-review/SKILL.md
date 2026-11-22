@@ -22,8 +22,8 @@ check a design decision against this fleet's standing architecture.
    `go test ./internal/architecture/... -v` first — if it's already red,
    report that and stop; don't hand-review what a fitness test already
    caught.
-2. **Context boundary.** node-performance consumes thirteen event types from five
-   producers, publishes two events and makes no synchronous call to a sibling
+2. **Context boundary.** node-performance consumes fifteen event types from six
+   producers, publishes three events and makes no synchronous call to a sibling
    (`docs/adr/0003-consumed-contracts-and-local-facts.md`; model `sync_calls: []`).
    Sibling data is event-fed local facts, never read live. Any outbound call, any new
    consumed topic or any new published event is an architectural decision that needs

@@ -6,7 +6,8 @@ import (
 	"github.com/claudioed/node-performance/internal/domain/shared"
 )
 
-// EntityScorecard is the entity segment of the CloudEvents type of both events.
+// EntityScorecard is the entity segment of the CloudEvents type of all three
+// events.
 const EntityScorecard = "scorecard"
 
 // NodeScorecardUpdated is raised by Recompute when the state, grade or metrics

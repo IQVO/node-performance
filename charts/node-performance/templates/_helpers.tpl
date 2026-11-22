@@ -208,6 +208,15 @@ Fully qualified name of the A2A agent Deployment/Service (cmd/a2a, ADR 0011).
 {{- include "node-performance.fullname" . }}-a2a
 {{- end }}
 
+{{/* agents.colocate (warehouse-infra ADR 0012): "true" iff colocate, mcp and a2a are all on; else empty. */}}
+{{- define "node-performance.agentsColocated" -}}
+{{- if and (.Values.agents | default dict).colocate .Values.mcp.enabled .Values.a2a.enabled }}true{{ end -}}
+{{- end }}
+
+{{- define "node-performance.agentsFullname" -}}
+{{- printf "%s-agents" (include "node-performance.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{/*
 Comma-joined names of this chart's enabled KongPlugins, for the
 konghq.com/plugins annotation on every HTTPRoute this chart renders.

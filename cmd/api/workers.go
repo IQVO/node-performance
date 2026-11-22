@@ -96,7 +96,7 @@ func runRecomputeRound(ctx context.Context, recompute usecases.Recompute, lease 
 		case ctx.Err() != nil:
 			return
 		case err != nil:
-			logger.Error("recompute lease acquire failed", "error", err)
+			logger.Error("recompute lease acquire failed", "error", sanitizeErr(err))
 			return
 		case !ok:
 			logger.Info("recompute round skipped, another replica holds the lease")
@@ -108,7 +108,7 @@ func runRecomputeRound(ctx context.Context, recompute usecases.Recompute, lease 
 	switch {
 	case ctx.Err() != nil:
 	case err != nil:
-		logger.Error("recompute round failed", "error", err, "recomputed", res.Recomputed, "events", res.Events)
+		logger.Error("recompute round failed", "error", sanitizeErr(err), "recomputed", res.Recomputed, "events", res.Events)
 	case res.Recomputed > 0 || res.Conflicts > 0:
 		logger.Info("recompute round", "recomputed", res.Recomputed, "events", res.Events, "conflicts", res.Conflicts)
 	}
